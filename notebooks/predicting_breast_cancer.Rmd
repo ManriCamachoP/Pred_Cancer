@@ -1,0 +1,45 @@
+---
+title: "Prediction of Breast Cancer Notebook"
+author: 
+  name: "Manrique Camacho P., Amanda Cedeño G., Iván Rodríguez C."
+
+institute: "Universidad de Costa Rica"
+lang: es  
+date: today
+date-format: long
+format: 
+  html:
+    toc: true
+    toc-depth: 4
+    theme: united
+    df-print: kable
+    number-sections: true
+    highlight-style: github
+    fig-dpi: 600
+    fig-width: 10
+    fig-height: 6
+    fig-align: default
+    fig-format: png
+editor: visual
+execute: 
+  echo: true
+  warning: false
+  message: false
+---
+
+# Predicting Breast Cancer
+
+## Loading Libraries
+
+```{r}
+#Classification Algorithms Libraries
+
+#Data Manipulation and Visualization Libraries
+library(tidyverse)
+```
+
+## Importing the dataset
+
+```{r}
+set
+```
