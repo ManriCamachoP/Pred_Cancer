@@ -2,7 +2,7 @@
 
 library(arrow) #Importing the parquet file
 library(dplyr) #Manipulating
-
+library(tidyr)
 #setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/raw")
 
 
@@ -58,7 +58,7 @@ df = df %>%
              GENHLTH, MENTHLTH, POORHLTH, EXERANY2, `_SMOKER3`, `_BMI5`, DIFFWALK, ADDEPEV3, #Health
              HADMAM, HOWLONG, CNCRDIFF, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
              ) %>% 
-      na.omit()
+      drop_na(Breast)
 
 #View(df)
 
