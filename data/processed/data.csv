@@ -1,4 +1,4 @@
-"","_STATE","SEXVAR","MARITAL","_RACE1","_AGE80","WEIGHT2","HEIGHT3","EDUCA","SLEPTIM1","DRNK3GE5","LCSNUMCG","GENHLTH","MENTHLTH","POORHLTH","EXERANY2","_SMOKER3","_BMI5","DIFFWALK","ADDEPEV3","HADMAM","HOWLONG","CNCRDIFF","CNCRAGE","Breast"
+"","State","Sex","Marital","Race","Age","Weight","Height","Education","TimeSlept","AlcoholConsumption","EverSmoked","Smoke","GeneralHealth","MentalHealth","PoorHealthAct","Exercise","TypeSmoker","BMI","WalkingDiff","MentalDis","EverMammo","TimeMammo","DiffCancer","AgeCancer"
 "1",5,2,1,1,78,115,505,6,7,88,NA,3,10,88,1,4,1914,2,2,1,1,2,40,"Breast Cancer"
 "2",5,2,1,1,78,200,507,6,7,8,777,3,88,88,2,3,3132,1,2,1,2,1,65,"No Breast Cancer"
 "3",5,1,1,1,72,245,602,6,8,18,NA,3,30,88,1,4,3146,1,1,NA,NA,1,55,"No Breast Cancer"

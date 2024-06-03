@@ -2,7 +2,8 @@
 
 library(arrow) #Importing the parquet file
 library(dplyr) #Manipulating
-library(tidyr)
+library(tidyr) #Manipulating
+
 #setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/raw")
 
 
@@ -56,23 +57,21 @@ df = df %>%
       select(`_STATE`, SEXVAR, MARITAL, `_RACE1`, `_AGE80`, WEIGHT2, HEIGHT3, EDUCA, #Demographics
              SLEPTIM1, DRNK3GE5, LCSNUMCG, #Habits
              GENHLTH, MENTHLTH, POORHLTH, EXERANY2, `_SMOKER3`, `_BMI5`, DIFFWALK, ADDEPEV3, #Health
-             HADMAM, HOWLONG, CNCRDIFF, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
+             HADMAM, HOWLONG, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
              ) %>% 
       drop_na(Breast)
 
 
-df = df %>% 
-  rename(`_STATE` = "State", SEXVAR = "Sex", MARITAL = "Marital", `_RACE1` = "Race", #Demographics
-         `_AGE80` = "Age", WEIGHT2 = "Weight", HEIGHT3 = "Height", EDUCA = "Education", #Demographics
-         SLEPTIM1 = "TimeSlept", DRNK3GE5 = "AlcoholConsumption", LCSFIRST = "EverSmoked", LCSNUMCG = "Smoke", #Habits
-         GENHLTH = "GeneralHealth", MENTHLTH = "MentalHealth", POORHLTH = "PoorHealth_Impeding", #Health
-         EXERANY2, `_SMOKER3`, `_BMI5`, DIFFWALK, ADDEPEV3, #Health
-         HADMAM, HOWLONG, CNCRDIFF, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
-         )
+colnames(df) = c("State", "Sex", "Marital", "Race", #Demographics
+                 "Age", "Weight", "Height", "Education", #Demographics
+                 "TimeSlept", "AlcoholConsumption", "EverSmoked", "Smoke", #Habits
+                 "GeneralHealth", "MentalHealth", "PoorHealthAct", #Health
+                 "Exercise", "TypeSmoker", "BMI", "WalkingDiff", "MentalDis", #Health
+                 "EverMammo", "TimeMammo", "DiffCancer", "AgeCancer", "BreastCancer")
 
 #View(df)
 
-#setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
+setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
 
 write.csv(df, "data.csv")  
 
