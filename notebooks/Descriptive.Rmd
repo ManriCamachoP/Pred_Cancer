@@ -32,11 +32,6 @@ execute:
 ## Loading Libraries
 
 ```{r}
-#Classification Algorithms 
-##install.packages("adabag")
-library(adabag) #Library for ADA Boosting Algorithm
-
-
 #Data Manipulation and Visualization
 
 library(tidyverse) #Ecosystem which contains our main libraries as dplyr and ggplot2
@@ -68,4 +63,5 @@ data$EDUCA = as.factor(data$EDUCA)
 
 
 data$Breast = as.factor(data$Breast)
+
 ```

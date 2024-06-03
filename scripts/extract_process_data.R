@@ -60,9 +60,19 @@ df = df %>%
              ) %>% 
       drop_na(Breast)
 
+
+df = df %>% 
+  rename(`_STATE` = "State", SEXVAR = "Sex", MARITAL = "Marital", `_RACE1` = "Race", #Demographics
+         `_AGE80` = "Age", WEIGHT2 = "Weight", HEIGHT3 = "Height", EDUCA = "Education", #Demographics
+         SLEPTIM1 = "TimeSlept", DRNK3GE5 = "AlcoholConsumption", LCSFIRST = "EverSmoked", LCSNUMCG = "Smoke", #Habits
+         GENHLTH = "GeneralHealth", MENTHLTH = "MentalHealth", POORHLTH = "PoorHealth_Impeding", #Health
+         EXERANY2, `_SMOKER3`, `_BMI5`, DIFFWALK, ADDEPEV3, #Health
+         HADMAM, HOWLONG, CNCRDIFF, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
+         )
+
 #View(df)
 
 #setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
 
 write.csv(df, "data.csv")  
-  
+
