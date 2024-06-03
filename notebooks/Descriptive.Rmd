@@ -1,0 +1,71 @@
+---
+title: "Prediction of Breast Cancer Notebook"
+author: 
+  name: "Manrique Camacho P., Amanda Cedeño G., Iván Rodríguez C."
+
+institute: "Universidad de Costa Rica"
+lang: es  
+date: today
+date-format: long
+format: 
+  html:
+    toc: true
+    toc-depth: 4
+    theme: united
+    df-print: kable
+    number-sections: true
+    highlight-style: github
+    fig-dpi: 600
+    fig-width: 10
+    fig-height: 6
+    fig-align: default
+    fig-format: png
+editor: visual
+execute: 
+  echo: true
+  warning: false
+  message: false
+---
+
+# Breast Cancer Descriptive Analysis
+
+## Loading Libraries
+
+```{r}
+#Classification Algorithms 
+##install.packages("adabag")
+library(adabag) #Library for ADA Boosting Algorithm
+
+
+#Data Manipulation and Visualization
+
+library(tidyverse) #Ecosystem which contains our main libraries as dplyr and ggplot2
+library(caret) #Data partitioning and model evaluation
+```
+
+## Importing the dataset
+
+```{r}
+data <- read.csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed/data.csv", row.names=1)
+```
+
+## Data Inspection
+
+```{r}
+str(data)
+```
+
+```{r}
+#Transforming to the correct data type 
+
+##Demographics
+data$SEXVAR = as.factor(data$SEXVAR)
+data$SEXVAR = as.factor(data$SEXVAR)
+data$X_RACE1 = as.factor(data$X_RACE1)
+
+##Social Variables 
+data$EDUCA = as.factor(data$EDUCA)
+
+
+data$Breast = as.factor(data$Breast)
+```
