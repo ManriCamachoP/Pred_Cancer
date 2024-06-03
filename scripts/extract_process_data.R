@@ -49,15 +49,20 @@ df$CNCRAGE #At what age you told that you had cancer
 
 
 df = df %>% 
-      filter(CNCRTYP2 == 5) %>% #Breast Cancer 
+      #filter(CNCRTYP2 == 5) %>% #Breast Cancer
+      mutate(Breast = 
+               case_when(CNCRTYP2 == 5 ~ "Breast Cancer",
+                         CNCRTYP2 != 5 ~ "No Breast Cancer")) %>% 
       select(`_STATE`, SEXVAR, MARITAL, `_RACE1`, `_AGE80`, WEIGHT2, HEIGHT3, EDUCA, #Demographics
              SLEPTIM1, DRNK3GE5, LCSNUMCG, #Habits
              GENHLTH, MENTHLTH, POORHLTH, EXERANY2, `_SMOKER3`, `_BMI5`, DIFFWALK, ADDEPEV3, #Health
-             HADMAM, HOWLONG, CNCRDIFF, CNCRDIFF, CNCRAGE #Breast Cancer
-             )
+             HADMAM, HOWLONG, CNCRDIFF, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
+             ) %>% 
+      na.omit()
 
+#View(df)
 
-setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
+#setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
 
 write.csv(df, "data.csv")  
   
