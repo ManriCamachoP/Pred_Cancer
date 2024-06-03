@@ -32,14 +32,48 @@ execute:
 ## Loading Libraries
 
 ```{r}
-#Classification Algorithms Libraries
+#Classification Algorithms 
+##install.packages("adabag")
+library(adabag) #Library for ADA Boosting Algorithm
 
-#Data Manipulation and Visualization Libraries
-library(tidyverse)
+
+#Data Manipulation and Visualization
+
+library(tidyverse) #Ecosystem which contains our main libraries as dplyr and ggplot2
+library(caret) #Data partitioning and model evaluation
 ```
 
 ## Importing the dataset
 
 ```{r}
-set
+data <- read.csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed/data.csv", row.names=1)
+```
+
+## Data Inspection
+
+```{r}
+str(data)
+```
+
+```{r}
+#Transforming to the correct data type 
+
+##Demographics
+data$SEXVAR = as.factor(data$SEXVAR)
+data$SEXVAR = as.factor(data$SEXVAR)
+data$X_RACE1 = as.factor(data$X_RACE1)
+
+##Social Variables 
+data$EDUCA = as.factor(data$EDUCA)
+
+
+data$Breast = as.factor(data$Breast)
+```
+
+## Working with the Algorithms
+
+### ADA Boosting
+
+```{r}
+
 ```
