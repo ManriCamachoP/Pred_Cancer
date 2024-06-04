@@ -4,7 +4,7 @@ library(arrow) #Importing the parquet file
 library(dplyr) #Manipulating
 library(tidyr) #Manipulating
 
-#setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/raw")
+setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/raw")
 
 
 #Importing the dataset
@@ -55,21 +55,21 @@ df = df %>%
                case_when(CNCRTYP2 == 5 ~ "Breast Cancer",
                          CNCRTYP2 != 5 ~ "No Breast Cancer")) %>% 
       select(`_STATE`, SEXVAR, MARITAL, `_RACE1`, `_AGE80`, WEIGHT2, HEIGHT3, EDUCA, #Demographics
-             SLEPTIM1, DRNK3GE5, LCSNUMCG, #Habits
+             SLEPTIM1, DRNK3GE5, LCSFIRST, LCSNUMCG, #Habits
              GENHLTH, MENTHLTH, POORHLTH, EXERANY2, `_SMOKER3`, `_BMI5`, DIFFWALK, ADDEPEV3, #Health
              HADMAM, HOWLONG, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
              ) %>% 
       drop_na(Breast)
 
 
-# colnames(df) = c("State", "Sex", "Marital", "Race", #Demographics
-#                  "Age", "Weight", "Height", "Education", #Demographics
-#                  "TimeSlept", "AlcoholConsumption", "EverSmoked", "Smoke", #Habits
-#                  "GeneralHealth", "MentalHealth", "PoorHealthAct", #Health
-#                  "Exercise", "TypeSmoker", "BMI", "WalkingDiff", "MentalDis", #Health
-#                  "EverMammo", "TimeMammo", "DiffCancer", "AgeCancer", "BreastCancer")
+colnames(df) = c("State", "Sex", "Marital", "Race", #Demographics
+                 "Age", "Weight", "Height", "Education", #Demographics
+                 "TimeSlept", "AlcoholConsumption", "EverSmoked", "Smoke", #Habits
+                 "GeneralHealth", "MentalHealth", "PoorHealthAct", #Health
+                 "Exercise", "TypeSmoker", "BMI", "WalkingDiff", "MentalDis", #Health
+                 "EverMammo", "TimeMammo", "DiffCancer", "AgeCancer", "BreastCancer")
 
-View(df)
+#View(df)
 
 #setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
 
