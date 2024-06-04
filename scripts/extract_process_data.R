@@ -62,16 +62,16 @@ df = df %>%
       drop_na(Breast)
 
 
-colnames(df) = c("State", "Sex", "Marital", "Race", #Demographics
-                 "Age", "Weight", "Height", "Education", #Demographics
-                 "TimeSlept", "AlcoholConsumption", "EverSmoked", "Smoke", #Habits
-                 "GeneralHealth", "MentalHealth", "PoorHealthAct", #Health
-                 "Exercise", "TypeSmoker", "BMI", "WalkingDiff", "MentalDis", #Health
-                 "EverMammo", "TimeMammo", "DiffCancer", "AgeCancer", "BreastCancer")
+# colnames(df) = c("State", "Sex", "Marital", "Race", #Demographics
+#                  "Age", "Weight", "Height", "Education", #Demographics
+#                  "TimeSlept", "AlcoholConsumption", "EverSmoked", "Smoke", #Habits
+#                  "GeneralHealth", "MentalHealth", "PoorHealthAct", #Health
+#                  "Exercise", "TypeSmoker", "BMI", "WalkingDiff", "MentalDis", #Health
+#                  "EverMammo", "TimeMammo", "DiffCancer", "AgeCancer", "BreastCancer")
 
-#View(df)
+View(df)
 
-setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
+#setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
 
 write.csv(df, "data.csv")  
 
