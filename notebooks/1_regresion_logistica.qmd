@@ -36,75 +36,69 @@ pacman::p_load(
 base = read_csv("C:/Users/Ivan RC/Desktop/OneDrive - Universidad Latina/I-2024/2. Análisis Multivariado/Proyectos/Pred_Cancer/data/processed/data.csv")
 
 # Vizualizar la base:
-base
+base1 = base %>% 
+  mutate_at(
+    .vars = vars(State, Sex, Marital, Race, Education,
+                 GeneralHealth, Exercise, TypeSmoker,
+                 WalkingDiff, MentalDis, EverMammo,
+                 TimeMammo, DiffCancer, BreastCancer), 
+    .funs = as.factor
+    ) %>% 
+  rename(ID = 1)
 
-# Mutar ciertas variables que deben ser factor y están numéricas: 
-# base %>% 
-#   mutate(
-#     #State = factor(State, labels = "Arkansas"),
-#     Sex = factor(Sex, labels = c("Male", "Female")),
-#     Marital = factor(Marital, labels = c("Maried",  "Divorced",
-#                                          "Widowed", "Separated",
-#                                          "Never Married", "A member of unmarried couple",
-#                                          "Refused")),
-#     Race = factor(Race, labels = c("White only", "Black only",
-#                                    "American-Indian or Alaskan Native", "Asian only",
-#                                    "Native Hawaiian or other Pacific Islander only",
-#                                    "Multiracial, Non Hispanic", "Hispanic",
-#                                    "Don’t know, Not sure or Don’t Respond")),
-#     Education = factor(Education, labels = c("Never attended Kindergarten", 
-#                                              "Elementary School",
-#                                              "Highschool (not finished)",
-#                                              "Highschool (finished)",
-#                                              "College (not finished)",
-#                                              "College graduate",
-#                                              "Refused")),
-#     # GeneralHealth = factor(GeneralHealth, labels = c("Excellent", "Very good",
-#     #                                                  "Good", "Fair",
-#     #                                                  "Poor", "Don’t know or not sure",
-#     #                                                  "Refused")),
-#     Exercise = factor(Exercise, labels = c("Yes", "No", 
-#                                            "Don’t know or not sure", "Refused")),
-#     TypeSmoker = factor(TypeSmoker, labels = c("Everyday smoker", "Smoke some days",
-#                                                "Former smoker", "Never smoked")),
-#     WalkingDiff = factor(WalkingDiff, labels = c("Yes", "No",
-#                                                  "Don’t know or not sure", "Refused")),
-#     MentalDis = factor(MentalDis, labels = c("Yes", "No",
-#                                              "Don’t know or not sure", "Refused")),
-#     EverMammo = factor(EverMammo, labels = c("Yes", "No",
-#                                              "Don’t know or not sure", "Refused")),
-#     TimeMammo = factor(TimeMammo, labels = c("Within a year", "Within two years",
-#                                              "Within three years", "Within five years",
-#                                              "Five or more years", "Don’t know or not sure",
-#                                              "Refused")),
-#     DiffCancer = factor(DiffCancer, labels = c("Only one", "Two",
-#                                                "Three or more", "Don’t know or not sure",
-#                                                "Refused"))
-#   )
+# Cambiar la categoría de referencia en la respuesta:
+base1$BreastCancer <- relevel(x = base1$BreastCancer, ref = "No Breast Cancer")
+contrasts(base1$BreastCancer)
+
+# Ver las categorías de referencia del sexo:
+contrasts(base1$Sex)
 ```
+
+
+
+---
+
+# Modelo logístico
+
+Fuente: https://stats.oarc.ucla.edu/r/dae/logit-regression/ 
+
+
+## Análisis descriptivo
 
 ```{r}
-# Cargar los paquetes necesarios
-library(dplyr)
-library(purrr)
-
-# Crear una función que genere una tabla de frecuencias para cada columna de un data frame
-tabla_frecuencias <- function(data) {
-  # Verificar que el argumento es un data frame
-  if (!is.data.frame(data)) {
-    stop("El argumento debe ser un data frame")
-  }
-  
-  # Usar map para iterar sobre las columnas del data frame y aplicar la función table
-  tablas <- map(data, ~ table(.x, useNA = "ifany"))
-  
-  return(tablas)
-}
-
-
-resultados <- tabla_frecuencias(base)
-
-# Imprimir los resultados
-print(resultados)
-
+base1 %>% 
+  group_by(BreastCancer, Sex) %>% 
+  summarise(
+    casos_totales = n(),
+    edad_media_persona = mean(Age, na.rm = T),
+    edad_diagnostico = mean(AgeCancer, na.rm = T) 
+    ) %>% 
+  mutate(casos_totales = as.numeric(casos_totales))
 ```
+
+## Modelo
+
+```{r}
+# Base de datos del modelo:
+base_modelo = base1 %>% select(-ID)
+
+# MOdelo:
+mod1 = glm(
+  formula = as.factor(BreastCancer) ~., 
+  family = binomial(link = "log"),
+  data = base_modelo  
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
