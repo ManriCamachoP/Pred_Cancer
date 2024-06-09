@@ -8,7 +8,7 @@ editor: visual
 
 ```{r}
 # Configuración base de R: 
-rm(list = ls(all.names = TRUE))
+rm(list = ls(all.names = TRUE)) 
 
 # Semillas:
 RNGkind(sample.kind = "Rounding")
@@ -22,7 +22,7 @@ set.seed(1234)
 ```{r}
 pacman::p_load(
   # Lectura y manipulación de datos: 
-  tidyverse, magrittr, rio, here,
+  tidyverse, magrittr, rio, here, caret, glmnet, performance, pROC,
   
   # Tablas de frecuencia, gráficos y demás:
   ggthemes, scales
@@ -47,21 +47,18 @@ base1 = base %>%
   rename(ID = 1)
 
 # Cambiar la categoría de referencia en la respuesta:
-base1$BreastCancer <- relevel(x = base1$BreastCancer, ref = "No Breast Cancer")
+base1$BreastCancer = relevel(x = base1$BreastCancer, ref = "No Breast Cancer")
 contrasts(base1$BreastCancer)
 
 # Ver las categorías de referencia del sexo:
 contrasts(base1$Sex)
 ```
 
-
-
----
+------------------------------------------------------------------------
 
 # Modelo logístico
 
-Fuente: https://stats.oarc.ucla.edu/r/dae/logit-regression/ 
-
+Fuente: https://stats.oarc.ucla.edu/r/dae/logit-regression/
 
 ## Análisis descriptivo
 
@@ -76,29 +73,126 @@ base1 %>%
   mutate(casos_totales = as.numeric(casos_totales))
 ```
 
-## Modelo
+## Selección de variables: Sin NA
+
+Para prevenir posibles errores en la convergencia del modelo logístico. Se decidió omitir aquellas variables que poseían valores faltantes (NA).
 
 ```{r}
-# Base de datos del modelo:
-base_modelo = base1 %>% select(-ID)
+base2 = base1 %>% select(where(~all(!is.na(.))))
 
-# MOdelo:
+# Verificar si cada variable tiene algún NA:
+sapply(base2, function(x) sum(is.na(x)))
+
+# Omitir el ID:
+base2 = base2 %>% select(-ID)
+```
+
+## Correlaciones
+
+Verificar la correrlación entre las variables numéricas.
+
+```{r}
+base2 %>% select_if(is.numeric) %>% correlation::correlation()
+```
+
+## Partición de la muestra
+
+Se trabaja con una muestra de 80% para entrenamiento y 20% para la prueba o testeo.
+
+```{r}
+# Partición de los datos
+train = createDataPartition(
+  # Variable respuesta:
+  y = base2$BreastCancer,
+  # Proporción de los datos:
+  p = 0.8,
+  # No devolver la lista de los ID seleccionados:
+  list = F
+)
+
+# Base de entrenamiento: 
+training = base2[train,]
+
+# Base de prueba (testeo):
+testing = base2[-train,] 
+```
+
+## Modelo
+
+### Manual
+
+Las variables de Age y TimeSlept generaron que no se puediera estimar el modelo en conjunto con las demás variables. Por ende, para este caso se omitieron.
+
+```{r}
+base2 %>% names()
+```
+
+```{r}
 mod1 = glm(
-  formula = as.factor(BreastCancer) ~., 
-  family = binomial(link = "log"),
-  data = base_modelo  
+  formula = BreastCancer ~ State + Sex + Marital + Race + Weight + Height + Education + GeneralHealth + MentalHealth + Exercise + TypeSmoker + WalkingDiff + MentalDis + DiffCancer + AgeCancer, 
+  family = binomial(link = "log"), 
+  data = training 
   )
 ```
 
+Además, se analizaron distintos apartados del modelo estimado:
 
+```{r}
+# Multicolinealidad:
+mod1 %>% performance::multicollinearity()
 
+# Autocorrelación:
+mod1 %>% performance::check_autocorrelation()
 
+# Valores extremos
+mod1 %>% performance::check_outliers()
 
+# Residuos:
+mod1 %>% performance::check_residuals()
+```
 
+## Modelo de entrenamiento caret
 
+Para este caso se hace uso de las funciones de la librería caret para estimar el modelo logístico el cual se realiza implementando de una vez la validación cruzada con 10 pliegos.
 
+```{r}
+# Especificar el control por validación cruzada con diez pliegos:
+train_control = trainControl(method = "cv", number = 10)
 
+# Ajustar el modelo logístico con la base de entrenamiento:
+cv_model = train(
+  BreastCancer ~ State + Sex + Marital + Race + Weight + Height + Education + GeneralHealth + MentalHealth + Exercise + TypeSmoker + WalkingDiff + MentalDis + DiffCancer + AgeCancer, 
+  data = training, 
+  method = "glm", 
+  family = binomial, 
+  trControl = train_control
+  )
 
+# Verificar el accuracy del modelo:
+print(cv_model)
 
+# Observar el accuracy para cada pliego estimado:
+cv_model$resample 
+```
 
+### Métricas de validación
 
+```{r}
+# Estimación de las predicciones en formato de probabilidad: 
+pred_prob = predict(cv_model, newdata = testing, type = "prob") %>% round(4)
+pred_prob %>% mutate(original = testing$BreastCancer)
+```
+
+```{r}
+# Probabilidades estimadas para las personas con cancer de mama:
+pred_prob_cancer = pred_prob[, "Breast Cancer"]
+
+# Curva ROC:
+roc_curve = roc(testing$BreastCancer, pred_prob_cancer)
+
+# Gráficar la curva ROC:
+plot(roc_curve)
+
+# Área debajo de la curva:  
+auc_value = auc(roc_curve) ; auc_value
+```
