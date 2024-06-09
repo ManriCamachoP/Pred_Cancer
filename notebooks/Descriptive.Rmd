@@ -53,15 +53,79 @@ str(data)
 ```{r}
 #Transforming to the correct data type 
 
-##Demographics
-data$SEXVAR = as.factor(data$SEXVAR)
-data$SEXVAR = as.factor(data$SEXVAR)
-data$X_RACE1 = as.factor(data$X_RACE1)
+data = data %>% 
+  mutate_at(
+    .vars = vars(State, Sex, Marital, Race, Education,
+                 GeneralHealth, Exercise, TypeSmoker,
+                 WalkingDiff, MentalDis, EverMammo,
+                 TimeMammo, DiffCancer, BreastCancer), 
+    .funs = as.factor
+    )
 
-##Social Variables 
-data$EDUCA = as.factor(data$EDUCA)
+contrasts(data$BreastCancer) #As we can see we need to change so that No Breast Cancer is 0
 
-
-data$Breast = as.factor(data$Breast)
-
+data$BreastCancer = relevel(x = data$BreastCancer, ref = "No Breast Cancer")
 ```
+
+
+
+```{r}
+na_data = matrix(rep(NA, length(colnames(data[,-1]))
+                     ), nrow = 1
+                 )
+
+
+for (i in 2:ncol(data)){
+ 
+  na_data[1,i-1] = sum(is.na(data[,i]))
+   
+}
+
+na_data = as.data.frame(x = na_data)
+colnames(na_data) = colnames(data[,-1])
+row.names(na_data) = "Cantidad NA"
+as.data.frame(t(na_data))$`Cantidad NA` - nrow(data)
+
+
+na_data[2,] = abs(as.data.frame(t(na_data))$`Cantidad NA` - nrow(data))
+
+row.names(na_data) = c("Cantidad NA", "Cantidad de Valores Completos")
+na_data = as.data.frame(t(na_data)); na_data
+
+na_data$Variable <- rownames(na_data)
+na_data_long <- pivot_longer(na_data, cols = c("Cantidad NA", "Cantidad de Valores Completos"), names_to = "Status", values_to = "Count")
+
+na_data_long <- na_data_long %>%
+  group_by(Variable) %>%
+  mutate(Total_NA = sum(Count[Status == "Cantidad NA"])) %>%
+  ungroup() %>%
+  arrange(Total_NA) %>%
+  mutate(Variable = factor(Variable, levels = unique(Variable)))
+
+
+na_data_long <- na_data_long %>%
+  group_by(Variable) %>%
+  mutate(Percentage = ifelse(Status == "Cantidad NA" & Count > 0, paste0(round((Count / sum(Count)) * 100, 1), "%"), ""))
+
+
+# Crear el gráfico de barras apiladas con códigos de color HTML
+ggplot(na_data_long, aes(x = Variable, y = Count, fill = Status)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = Percentage), position = position_stack(vjust = 0.5), color = "white", size = 3) +
+  labs(title = "Conteo de Valores NA y No-NA por Variable",
+       x = "Variable",
+       y = "Conteo") +
+  scale_fill_manual(values = c("Cantidad NA" = "#FF6347", "Cantidad de Valores Completos" = "#1E90FF"))+
+  coord_flip()+
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1.2),
+        legend.position = "top",
+      legend.title = element_blank(),
+      legend.key.size = unit(0.5, "cm"))
+
+
+data2 = drop_na(data)
+
+sum(data2$BreastCancer=="Breast Cancer")/nrow(data2)
+```
+
