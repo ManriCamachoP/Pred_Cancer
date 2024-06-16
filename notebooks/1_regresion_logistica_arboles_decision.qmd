@@ -24,10 +24,14 @@ pacman::p_load(
   # Lectura y manipulación de datos: 
   tidyverse, magrittr, rio, here, caret, glmnet, performance, pROC,
   
+  # Arboles:
+  rpart, rattle, randomForest, ipred,
+  
   # Tablas de frecuencia, gráficos y demás:
   ggthemes, scales
 )
 ```
+
 
 ## Datos
 
@@ -196,3 +200,66 @@ plot(roc_curve)
 # Área debajo de la curva:  
 auc_value = auc(roc_curve) ; auc_value
 ```
+
+
+---
+
+# Arboles 
+
+```{r}
+library(rpart) ; library(rattle)
+```
+
+
+```{r}
+arbol1 = rpart(formula = BreastCancer ~., 
+               method = "class", 
+               control = rpart.control(minsplit = 20, cp = 0.01),
+               data = training)
+
+arbol1 %>% summary()
+
+fancyRpartPlot(arbol1)
+```
+
+
+---
+
+# Bagging
+
+```{r}
+bag1 = bagging(formula = BreastCancer ~ ., 
+  data = training, 
+  nbagg = 50,    
+  coob = TRUE, 
+  mfinal = 19,
+  control = rpart.control(minsplit = 2, cp = 0,  min_depth = 2))
+```
+
+
+dura aprox 18-19 min
+
+```{r}
+bag2 <- train(
+  BreastCancer ~ .,
+  data = training,
+  method = "treebag",
+  trControl = trainControl(method = "cv", number = 10),
+  nbagg = 50,  
+  control = rpart.control(minsplit = 2, cp = 0)
+)
+
+# Predicciones
+predictions  = predict(bag2, newdata = testing)
+
+roc_curve <- roc(testing$BreastCancer, as.numeric(predictions))
+plot(roc_curve)
+auc(roc_curve)
+
+varImp(bag2)
+
+bag2$results
+bag2$resample
+```
+
+
