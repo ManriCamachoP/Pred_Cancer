@@ -10,68 +10,109 @@ setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRi
 #Importing the dataset
 df = read_parquet("raw_data.parquet")
 
+
 #Filtering the data for the variables of interest
 
 #------------ DEMOGRAPHICS 
 df$`_STATE` #State
-df$SEXVAR #Sex, combining both land line survey with cellphone survey
-df$MARITAL #Maritial status
+#df$SEXVAR #Sex, combining both land line survey with cellphone survey
 df$`_RACE1` #Race
 df$`_AGE80` #AGE
-df$WEIGHT2 #Weight
-df$HEIGHT3 #Height
 df$EDUCA #Education
+df$`_CHLDCNT` #Count of children on the household
 
 #------------- HABITS
 df$SLEPTIM1 #Average of hours of sleep in a 24-hour period
-df$DRNK3GE5 #how many times during the past 30 days did you have 5 or more drinks for men or 4 or more drinks for women on an occasion
-df$LCSNUMCG #On average, when you {smoke/smoked} regularly, about how many cigarettes {do/did} you usually smoke each day
-
+df$ALCDAY4#How many days per week or per month did the respondent have at least one drink of any alcoholic beverage
 
 #------------- HEALTH
 df$GENHLTH #General Health
-df$MENTHLTH #Mental Health, days where mental health was not good in a span of 30 days.
-df$POORHLTH #General Health and Mental Health impeding doing usual activities, like selfcare.
 df$EXERANY2 #Participate in any pyhsical or exercise activities
-#df$CVDINFR4 #Ever experienced a heart attack -- Puede ser solo que hay que buscar literatura
 df$`_SMOKER3` #Four level smoker status: Everyday (1), Someday (2), Former (3), Non (4), No response (9)
 df$`_BMI5` #Body Mass Index (BMI)
-df$DIFFWALK #Serious difficulty walking or climbing stairs
 df$ADDEPEV3 #Have you had a depressive disorder
-
 
 #------------- Breast Cancer
 df$CNCRTYP2 == 5 #The value 5 indicates breast cancer
 df$HADMAM #Ever had a mammogram
-df$HOWLONG #How long has it been since the last mammogram
-df$CNCRDIFF #How many types of cancer
-df$CNCRAGE #At what age you told that you had cancer
+
+#----------- Economic
+df$PRIMINSR
 
 
-
+#------------ Filtro de la base
 df = df %>% 
-      #filter(CNCRTYP2 == 5) %>% #Breast Cancer
+      filter(SEXVAR == 2) %>% 
       mutate(Breast = 
                case_when(CNCRTYP2 == 5 ~ "Breast Cancer",
-                         CNCRTYP2 != 5 ~ "No Breast Cancer")) %>% 
-      select(`_STATE`, SEXVAR, MARITAL, `_RACE1`, `_AGE80`, WEIGHT2, HEIGHT3, EDUCA, #Demographics
-             SLEPTIM1, DRNK3GE5, LCSFIRST, LCSNUMCG, #Habits
-             GENHLTH, MENTHLTH, POORHLTH, EXERANY2, `_SMOKER3`, `_BMI5`, DIFFWALK, ADDEPEV3, #Health
-             HADMAM, HOWLONG, CNCRDIFF, CNCRAGE, Breast #Breast Cancer
-             ) %>% 
-      drop_na(Breast)
+                         CNCRTYP2 != 5 ~ "No Breast Cancer"),
+             AlcoholCons = 
+               case_when((ALCDAY4>100) & (ALCDAY4<200) == TRUE ~ (ALCDAY4-100)*4,
+                         (ALCDAY4>200) & (ALCDAY4<300) == TRUE ~ ALCDAY4-200,
+                         ALCDAY4 == 888 ~ 0,
+                         TRUE ~ NA),
+             Smoker = 
+               case_when(`_SMOKER3` == 1 ~ 1,
+                         `_SMOKER3` == 2 ~ 1,
+                         `_SMOKER3` == 3 ~ 1,
+                         `_SMOKER3` == 4 ~ 0,
+                         `_SMOKER3` == 9 ~ NA), 
+             Depression = 
+               case_when(ADDEPEV3 < 3 ~ ADDEPEV3,
+                         TRUE ~ NA),
+             Exercise = 
+               case_when(EXERANY2 < 3 ~ EXERANY2,
+                         TRUE ~ NA),
+             
+             Mammo = 
+               case_when(HADMAM < 3 ~ HADMAM,
+                         TRUE ~ NA),
+             Race = 
+               case_when(`_RACE1` < 9 ~ `_RACE1`,
+                         TRUE ~ NA),
+             Education = 
+               case_when(EDUCA<9 ~ EDUCA,
+                         TRUE~NA),
+             Sleep = 
+               case_when(SLEPTIM1 < 77 ~ SLEPTIM1,
+                         TRUE ~ NA),
+             GeneralHealth = 
+               case_when(GENHLTH < 7 ~ GENHLTH,
+                         TRUE ~ NA),
+             Coverage = 
+               case_when(PRIMINSR == 1 ~ "Comprehensive Coverage",
+                         PRIMINSR == 2 ~ "Comprehensive Coverage",
+                         PRIMINSR == 3 ~ "Moderate Coverage",
+                         PRIMINSR == 4 ~ "Moderate Coverage",
+                         PRIMINSR == 5 ~ "Moderate Coverage",
+                         PRIMINSR == 7 ~ "Moderate Coverage",
+                         PRIMINSR == 9 ~ "Moderate Coverage",
+                         PRIMINSR == 6 ~ "Limited or no Coverage or Uncertain",
+                         PRIMINSR == 8 ~ "Limited or no Coverage or Uncertain",
+                         PRIMINSR == 10 ~ "Limited or no Coverage or Uncertain",
+                         PRIMINSR == 88 ~ "Limited or no Coverage or Uncertain",
+                         PRIMINSR == 99 ~ NA
+                         ),
+             Children = 
+               case_when(`_CHLDCNT` == 1 ~ 0,
+                         `_CHLDCNT` == 2 ~ 1,
+                         `_CHLDCNT` == 3 ~ 2,
+                         `_CHLDCNT` == 4 ~ 3,
+                         `_CHLDCNT` == 5 ~ 3,
+                         `_CHLDCNT` == 6 ~ 3,
+                         TRUE ~ NA)) %>%
+      select(`_STATE`, `_AGE80`, Race, Education, `_BMI5`,Coverage,
+             GeneralHealth, Children, Sleep, Depression, Exercise, 
+             Smoker, AlcoholCons, Mammo, Breast) %>% 
+      drop_na()
 
 
-colnames(df) = c("State", "Sex", "Marital", "Race", #Demographics
-                 "Age", "Weight", "Height", "Education", #Demographics
-                 "TimeSlept", "AlcoholConsumption", "EverSmoked", "Smoke", #Habits
-                 "GeneralHealth", "MentalHealth", "PoorHealthAct", #Health
-                 "Exercise", "TypeSmoker", "BMI", "WalkingDiff", "MentalDis", #Health
-                 "EverMammo", "TimeMammo", "DiffCancer", "AgeCancer", "BreastCancer")
+colnames(df) = c("State", "Age", "Race", "Education", "BMI", "Coverage", "GeneralHealth", "Children","Sleep", "Depression",
+                 "Exercise","Smoker","AlcoholCons", "Mammo", "Breast")
 
 #View(df)
 
-#setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
+setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
 
-write.csv(df, "data.csv")  
+write.csv(df, "data.csv")
 

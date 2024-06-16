@@ -51,25 +51,6 @@ str(data)
 ```
 
 ```{r}
-#Transforming to the correct data type 
-
-data = data %>% 
-  mutate_at(
-    .vars = vars(State, Sex, Marital, Race, Education,
-                 GeneralHealth, Exercise, TypeSmoker,
-                 WalkingDiff, MentalDis, EverMammo,
-                 TimeMammo, DiffCancer, BreastCancer), 
-    .funs = as.factor
-    )
-
-contrasts(data$BreastCancer) #As we can see we need to change so that No Breast Cancer is 0
-
-data$BreastCancer = relevel(x = data$BreastCancer, ref = "No Breast Cancer")
-```
-
-
-
-```{r}
 na_data = matrix(rep(NA, length(colnames(data[,-1]))
                      ), nrow = 1
                  )
@@ -105,7 +86,7 @@ na_data_long <- na_data_long %>%
 
 na_data_long <- na_data_long %>%
   group_by(Variable) %>%
-  mutate(Percentage = ifelse(Status == "Cantidad NA" & Count > 0, paste0(round((Count / sum(Count)) * 100, 1), "%"), ""))
+  mutate(Percentage = ifelse(Status == "Cantidad NA" & Count > 0.9, paste0(round((Count / sum(Count)) * 100, 1), "%"), ""))
 
 
 # Crear el gráfico de barras apiladas con códigos de color HTML
@@ -128,4 +109,3 @@ data2 = drop_na(data)
 
 sum(data2$BreastCancer=="Breast Cancer")/nrow(data2)
 ```
-
