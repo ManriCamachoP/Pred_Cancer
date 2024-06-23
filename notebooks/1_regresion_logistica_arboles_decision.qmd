@@ -32,7 +32,6 @@ pacman::p_load(
 )
 ```
 
-
 ## Datos
 
 ```{r}
@@ -40,23 +39,43 @@ pacman::p_load(
 base = read_csv("C:/Users/Ivan RC/Desktop/OneDrive - Universidad Latina/I-2024/2. Análisis Multivariado/Proyectos/Pred_Cancer/data/processed/data.csv")
 
 # Vizualizar la base:
-base1 = base %>% 
-  mutate_at(
-    .vars = vars(State, Sex, Marital, Race, Education,
-                 GeneralHealth, Exercise, TypeSmoker,
-                 WalkingDiff, MentalDis, EverMammo,
-                 TimeMammo, DiffCancer, BreastCancer), 
-    .funs = as.factor
-    ) %>% 
-  rename(ID = 1)
+# base1 = base %>% 
+#   mutate_at(
+#     .vars = vars(State, Sex, Marital, Race, Education,
+#                  GeneralHealth, Exercise, TypeSmoker,
+#                  WalkingDiff, MentalDis, EverMammo,
+#                  TimeMammo, DiffCancer, BreastCancer), 
+#     .funs = as.factor
+#     ) %>% 
+#   rename(ID = 1)
 
 # Cambiar la categoría de referencia en la respuesta:
-base1$BreastCancer = relevel(x = base1$BreastCancer, ref = "No Breast Cancer")
-contrasts(base1$BreastCancer)
-
-# Ver las categorías de referencia del sexo:
-contrasts(base1$Sex)
+# base1$BreastCancer = relevel(x = base1$BreastCancer, ref = "No Breast Cancer")
+# contrasts(base1$BreastCancer)
+# 
+# # Ver las categorías de referencia del sexo:
+# contrasts(base1$Sex)
 ```
+
+
+
+
+```{r}
+# Modificar algunas variables.
+base1 = base %>% 
+  mutate_at(.vars = vars(State, Race, Education, 
+                         Coverage, GeneralHealth, 
+                         Children, Depression,
+                         Exercise, Smoker,
+                         Mammo, Breast), 
+            .funs = as.factor) %>% 
+  select(-1)
+
+# Poner la categoría que sí tiene cancer: 
+base1$Breast = relevel(x = base1$Breast, ref = "No Breast Cancer")
+contrasts(base1$Breast)
+```
+
 
 ------------------------------------------------------------------------
 
@@ -67,14 +86,14 @@ Fuente: https://stats.oarc.ucla.edu/r/dae/logit-regression/
 ## Análisis descriptivo
 
 ```{r}
-base1 %>% 
-  group_by(BreastCancer, Sex) %>% 
-  summarise(
-    casos_totales = n(),
-    edad_media_persona = mean(Age, na.rm = T),
-    edad_diagnostico = mean(AgeCancer, na.rm = T) 
-    ) %>% 
-  mutate(casos_totales = as.numeric(casos_totales))
+# base %>% 
+#   group_by(Breast) %>% 
+#   summarise(
+#     casos_totales = n(),
+#     edad_media_persona = mean(Age, na.rm = T),
+#     edad_diagnostico = mean(AgeCancer, na.rm = T) 
+#     ) %>% 
+#   mutate(casos_totales = as.numeric(casos_totales))
 ```
 
 ## Selección de variables: Sin NA
@@ -82,13 +101,13 @@ base1 %>%
 Para prevenir posibles errores en la convergencia del modelo logístico. Se decidió omitir aquellas variables que poseían valores faltantes (NA).
 
 ```{r}
-base2 = base1 %>% select(where(~all(!is.na(.))))
+#base2 = base1 %>% select(where(~all(!is.na(.))))
 
 # Verificar si cada variable tiene algún NA:
-sapply(base2, function(x) sum(is.na(x)))
+sapply(base1, function(x) sum(is.na(x)))
 
 # Omitir el ID:
-base2 = base2 %>% select(-ID)
+# base2 = base2 %>% select(-ID)
 ```
 
 ## Correlaciones
@@ -96,7 +115,7 @@ base2 = base2 %>% select(-ID)
 Verificar la correrlación entre las variables numéricas.
 
 ```{r}
-base2 %>% select_if(is.numeric) %>% correlation::correlation()
+base1 %>% select_if(is.numeric) %>% correlation::correlation()
 ```
 
 ## Partición de la muestra
@@ -107,7 +126,7 @@ Se trabaja con una muestra de 80% para entrenamiento y 20% para la prueba o test
 # Partición de los datos
 train = createDataPartition(
   # Variable respuesta:
-  y = base2$BreastCancer,
+  y = base1$Breast,
   # Proporción de los datos:
   p = 0.8,
   # No devolver la lista de los ID seleccionados:
@@ -115,11 +134,13 @@ train = createDataPartition(
 )
 
 # Base de entrenamiento: 
-training = base2[train,]
+training = base1[train,]
 
 # Base de prueba (testeo):
-testing = base2[-train,] 
+testing = base1[-train,] 
 ```
+
+
 
 ## Modelo
 
@@ -128,31 +149,44 @@ testing = base2[-train,]
 Las variables de Age y TimeSlept generaron que no se puediera estimar el modelo en conjunto con las demás variables. Por ende, para este caso se omitieron.
 
 ```{r}
-base2 %>% names()
+base1 %>% names()
 ```
 
 ```{r}
 mod1 = glm(
-  formula = BreastCancer ~ State + Sex + Marital + Race + Weight + Height + Education + GeneralHealth + MentalHealth + Exercise + TypeSmoker + WalkingDiff + MentalDis + DiffCancer + AgeCancer, 
-  family = binomial(link = "log"), 
+  formula = Breast ~ State + Age + Race + Education + BMI + Coverage + GeneralHealth + Children + Sleep + Depression + Exercise + Smoker + AlcoholCons + Mammo, 
+  family = "binomial", 
   data = training 
   )
+
+mod2 = step(object = mod1, direction = "forward", trace = F)
+
+# lme4::glmer(
+#   formula = Breast ~ Age + Race + Education + BMI + Coverage + GeneralHealth + Children + Sleep + Depression + Exercise + Smoker + AlcoholCons + Mammo + (1|State),
+#   data = training, 
+#   family = "binomial")
 ```
 
 Además, se analizaron distintos apartados del modelo estimado:
 
 ```{r}
 # Multicolinealidad:
-mod1 %>% performance::multicollinearity()
+mod1 %>% multicollinearity()
 
 # Autocorrelación:
-mod1 %>% performance::check_autocorrelation()
+mod1 %>% check_autocorrelation()
 
 # Valores extremos
-mod1 %>% performance::check_outliers()
+mod1 %>% check_outliers()
 
 # Residuos:
-mod1 %>% performance::check_residuals()
+mod1 %>% check_residuals()
+
+mod1 %>% performance::model_performance()
+
+DescTools::PseudoR2(mod2, which = "all") %>% round(5)
+
+mod2 %>% performance::check_model()
 ```
 
 ## Modelo de entrenamiento caret
@@ -165,7 +199,7 @@ train_control = trainControl(method = "cv", number = 10)
 
 # Ajustar el modelo logístico con la base de entrenamiento:
 cv_model = train(
-  BreastCancer ~ State + Sex + Marital + Race + Weight + Height + Education + GeneralHealth + MentalHealth + Exercise + TypeSmoker + WalkingDiff + MentalDis + DiffCancer + AgeCancer, 
+  Breast ~ State + Age + Race + Education + BMI + Coverage + GeneralHealth + Children + Sleep + Depression + Exercise + Smoker + AlcoholCons + Mammo, 
   data = training, 
   method = "glm", 
   family = binomial, 
@@ -185,6 +219,8 @@ cv_model$resample
 # Estimación de las predicciones en formato de probabilidad: 
 pred_prob = predict(cv_model, newdata = testing, type = "prob") %>% round(4)
 pred_prob %>% mutate(original = testing$BreastCancer)
+
+pred_prob %>% filter(`Breast Cancer` > 0.5)
 ```
 
 ```{r}
@@ -192,7 +228,7 @@ pred_prob %>% mutate(original = testing$BreastCancer)
 pred_prob_cancer = pred_prob[, "Breast Cancer"]
 
 # Curva ROC:
-roc_curve = roc(testing$BreastCancer, pred_prob_cancer)
+roc_curve = roc(testing$Breast, pred_prob_cancer)
 
 # Gráficar la curva ROC:
 plot(roc_curve)
@@ -204,12 +240,130 @@ auc_value = auc(roc_curve) ; auc_value
 
 ---
 
-# Arboles 
+# MANUAL
+
+
+```{r}
+# Ajustar el modelo logístico con la base de datos de entrenamiento
+model = glm(
+  formula = Breast ~ State + Age + Race + Education + BMI + Coverage + GeneralHealth + Children + Sleep + Depression + Exercise + Smoker + AlcoholCons + Mammo, 
+  family = binomial,
+  data = training 
+  )
+
+model1 = step(object = model, direction = "forward", trace = F)
+
+drop1(model1, test = "LRT")
+
+# K-fold cv:
+# Realizar la validación cruzada con 10 pliegues
+cv_results = boot::cv.glm(data = training, glmfit = model1, K = 5)
+
+# Imprimir los resultados de la validación cruzada
+#print(cv_results)
+
+# Calcular la precisión promedio
+accuracy = 1 - mean(cv_results$delta)
+print(accuracy)
+
+# Obtener las probabilidades predichas
+probabilities = predict(model1, newdata = testing, type = "response")
+
+# Calcular la curva ROC y el AUC
+library(pROC)
+roc_curve = roc(testing$Breast, probabilities)
+auc_value = auc(roc_curve)
+auc(roc_curve) ; plot(roc_curve)
+
+roc_curve$sensitivities %>% summary()
+```
+
+
+```{r}
+cv_fold = function(data, formula, nfolds) {
+  
+  # Eliminar niveles de factores sin observaciones
+  data = droplevels(data)
+  
+  # Dividir los datos en nfolds particiones
+  folds = cut(seq(1, nrow(data)), breaks = nfolds, labels = FALSE)
+  
+  # Inicializar el vector para almacenar los errores de predicción
+  errors = numeric(nfolds)
+  
+  # Realizar la validación cruzada
+  for (i in 1:nfolds) {
+    # Separar los datos en entrenamiento y prueba
+    test_idx = which(folds == i, arr.ind = TRUE)
+    train_idx = which(folds != i, arr.ind = TRUE)
+    train_data = data[train_idx, ]
+    test_data = data[test_idx, ]
+    
+    # Ajustar el modelo con los datos de entrenamiento
+    model = glm(formula, data = train_data, family = binomial)
+    
+    # Calcular las predicciones en los datos de prueba
+    predictions = predict(model, newdata = test_data, type = "response")
+    
+    # Calcular el error de predicción
+    errors[i] = mean(abs(test_data[, "Breast cancer"] - predictions))
+  }
+  
+  # Calcular la precisión promedio
+  accuracy = 1 - mean(errors)
+  
+  # Devolver los resultados
+  return(list(errors = errors, accuracy = accuracy))
+}
+
+
+# Definir la fórmula del modelo
+formula = Breast ~ State + Age + Race + Education + BMI + Coverage + GeneralHealth + Children + Sleep + Depression + Exercise + Smoker + AlcoholCons + Mammo
+
+# Realizar la validación cruzada
+cv_results = cv_fold(data = training, formula = formula, nfolds = 10)
+
+# Imprimir los errores de predicción
+print(cv_results$errors)
+
+# Imprimir la precisión promedio
+print(cv_results$accuracy)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------------------------------------------------------
+
+# Arboles
 
 ```{r}
 library(rpart) ; library(rattle)
 ```
-
 
 ```{r}
 arbol1 = rpart(formula = BreastCancer ~., 
@@ -222,8 +376,7 @@ arbol1 %>% summary()
 fancyRpartPlot(arbol1)
 ```
 
-
----
+------------------------------------------------------------------------
 
 # Bagging
 
@@ -236,11 +389,10 @@ bag1 = bagging(formula = BreastCancer ~ .,
   control = rpart.control(minsplit = 2, cp = 0,  min_depth = 2))
 ```
 
-
 dura aprox 18-19 min
 
 ```{r}
-bag2 <- train(
+bag2 = train(
   BreastCancer ~ .,
   data = training,
   method = "treebag",
@@ -252,7 +404,7 @@ bag2 <- train(
 # Predicciones
 predictions  = predict(bag2, newdata = testing)
 
-roc_curve <- roc(testing$BreastCancer, as.numeric(predictions))
+roc_curve = roc(testing$BreastCancer, as.numeric(predictions))
 plot(roc_curve)
 auc(roc_curve)
 
@@ -261,5 +413,3 @@ varImp(bag2)
 bag2$results
 bag2$resample
 ```
-
-

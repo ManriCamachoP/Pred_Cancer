@@ -1,0 +1,475 @@
+---
+title: "Logistica y KNN"
+format: html
+editor: visual
+---
+
+# Configuración general
+
+```{r}
+# Configuración base de R: 
+rm(list = ls(all.names = TRUE)) 
+
+# Semillas:
+RNGkind(sample.kind = "Rounding")
+
+# Semilla para los análisis aleatorios: 
+set.seed(1234)
+```
+
+## Librerías
+
+```{r}
+pacman::p_load(
+  # Lectura y manipulación de datos: 
+  tidyverse, magrittr, rio, here, caret, glmnet, performance, pROC,
+  
+  # Arboles:
+  rpart, rattle, DT, adabag, randomForest, cluster, #ipred,
+  
+  # Tablas de frecuencia, gráficos y demás:
+  ggthemes, scale
+)
+```
+
+## Datos
+
+```{r}
+# Cargar la base de datos:
+base = read_csv("C:/Users/Ivan RC/Desktop/OneDrive - Universidad Latina/I-2024/2. Análisis Multivariado/Proyectos/Pred_Cancer/data/processed/data.csv")
+
+# Modificar algunas variables.
+base1 = base %>% 
+  mutate_at(.vars = vars(State, Race, Education, 
+                         Coverage, GeneralHealth, 
+                         Children, Depression,
+                         Exercise, Smoker,
+                         Mammo, Breast), 
+            .funs = as.factor) %>% 
+  select(-1)
+
+# Poner la categoría que sí tiene cancer: 
+base1$Breast = relevel(x = base1$Breast, ref = "No Breast Cancer")
+contrasts(base1$Breast)
+```
+
+## Partición de la muestra
+
+Se trabaja con una muestra de 80% para entrenamiento y 20% para la prueba o testeo.
+
+```{r}
+# Partición de los datos
+train = createDataPartition(
+  # Variable respuesta:
+  y = base1$Breast,
+  # Proporción de los datos:
+  p = 0.8,
+  # No devolver la lista de los ID seleccionados:
+  list = F
+)
+
+# Base de entrenamiento: 
+training = base1[train,]
+
+# Base de prueba (testeo):
+testing = base1[-train,] 
+```
+
+------------------------------------------------------------------------
+
+# Modelo logístico
+
+Fuente: https://stats.oarc.ucla.edu/r/dae/logit-regression/
+
+## Verificar presencia de NA
+
+```{r}
+# Verificar si cada variable tiene algún NA:
+sapply(base1, function(x) sum(is.na(x)))
+```
+
+## Correlaciones
+
+Verificar la correrlación entre las variables numéricas.
+
+```{r}
+training %>% select_if(is.numeric) %>% correlation::correlation()
+```
+
+------------------------------------------------------------------------
+
+# ALGORITMOS
+
+## LOGISTICO
+
+```{r}
+# Definir el número de pliegues (k-fold cross-validation)
+k = 10
+# Obtener el número total de observaciones
+n = nrow(training)
+# Crear índices para los pliegues
+set.seed(1234)  # Establecer semilla para reproducibilidad
+fold_indices = sample(rep(1:k, length.out = n))
+
+# Inicializar matriz para almacenar resultados y lista para fórmulas de modelos
+resultados = matrix(NA, nrow = k, ncol = 8)
+colnames(resultados) = c("accuracy", "error_rate", "sensitivity", "specificity", "false_positives", "false_negatives", "kappa", "auc")
+model_formulas = vector("list", k)
+
+# Realizar la validación cruzada y calcular los indicadores
+for (i in 1:k) {
+  # Obtener índices para el conjunto de entrenamiento y prueba
+  training_indices = which(fold_indices != i)
+  test_indices = which(fold_indices == i)
+  
+  # Subconjuntos de entrenamiento y prueba
+  training_fold = training[training_indices, ]
+  test_fold = training[test_indices, ]
+  
+  # Entrenar el clasificador
+  clasificador = glm(Breast ~ ., family = binomial, data = training_fold)
+  clasificador = step(clasificador, trace = FALSE)  # Aplicar stepwise
+  
+  # Almacenar la fórmula del modelo ajustado
+  model_formulas[[i]] = formula(clasificador)
+  
+  # Realizar predicciones en el conjunto de prueba (test_fold)
+  y_pred_prob = predict(clasificador, type = 'response', newdata = test_fold)
+  y_pred = ifelse(y_pred_prob > 0.5, 1, 0)
+  y_pred = factor(y_pred, levels = c(0, 1), labels = c("No Breast Cancer", "Breast Cancer"))
+  
+  # Crear la matriz de confusión
+  cm = confusionMatrix(y_pred, test_fold$Breast, positive = "Breast Cancer")
+  
+  # Calcular métricas adicionales
+  fp = cm$table[2,1]  # Falsos positivos
+  fn = cm$table[1,2]  # Falsos negativos
+  
+  # Obtener indicadores
+  resultados[i, ] = c(
+    cm$overall['Accuracy'],
+    1 - cm$overall['Accuracy'],  # Error rate
+    cm$byClass['Sensitivity'],
+    cm$byClass['Specificity'],
+    fp,
+    fn,
+    cm$overall['Kappa'],
+    auc(roc(as.numeric(test_fold$Breast), as.numeric(y_pred_prob)))
+  )
+}
+
+# Mostrar los resultados de la validación cruzada
+final = as.data.frame(resultados) %>% mutate(Pliegue = 1:10)
+final
+
+# Mostrar las fórmulas de los modelos ajustados
+print(model_formulas)
+
+# --- Evaluación final con la base de prueba (testing) ---
+
+# Entrenar el modelo final con todo el conjunto de entrenamiento
+final_model = glm(Breast ~ ., family = binomial, data = training)
+final_model = step(final_model, trace = FALSE)  # Aplicar stepwise
+
+# Realizar predicciones en el conjunto de prueba (testing)
+final_pred_prob = predict(final_model, type = 'response', newdata = testing)
+final_pred = ifelse(final_pred_prob > 0.5, 1, 0)
+final_pred = factor(final_pred, levels = c(0, 1), labels = c("No Breast Cancer", "Breast Cancer"))
+
+# Crear la matriz de confusión
+final_cm = confusionMatrix(final_pred, testing$Breast, positive = "Breast Cancer")
+
+# Calcular métricas adicionales para la base de prueba
+final_fp = final_cm$table[2,1]  # Falsos positivos
+final_fn = final_cm$table[1,2]  # Falsos negativos
+
+# Obtener indicadores
+final_results = data.frame(
+  accuracy = final_cm$overall['Accuracy'],
+  error_rate = 1 - final_cm$overall['Accuracy'],  # Error rate
+  sensitivity = final_cm$byClass['Sensitivity'],
+  specificity = final_cm$byClass['Specificity'],
+  false_positives = final_fp,
+  false_negatives = final_fn,
+  kappa = final_cm$overall['Kappa'],
+  auc = auc(roc(as.numeric(testing$Breast), as.numeric(final_pred_prob)))
+)
+
+# Mostrar los resultados finales en el conjunto de prueba (testing)
+final ; final_results
+```
+
+
+------------------------------------------------------------------------
+
+## KNN
+
+```{r}
+knn_cancer_predictor = function(train_data, test_data, target_col, 
+                                k_range = seq(from = 3, to = 27, by = 3)) {
+  #library(cluster)
+  #library(pROC)
+  
+  start_time = Sys.time()
+  
+  # Función para mostrar el tiempo transcurrido
+  show_elapsed_time = function(start_time, step) {
+    current_time = Sys.time()
+    elapsed = difftime(current_time, start_time, units = "secs")
+    cat(sprintf("%s - Tiempo transcurrido: %.2f segundos\n", step, elapsed))
+  }
+  
+  # Separar características y etiquetas
+  X_train = train_data[, -which(names(train_data) == target_col)]
+  y_train = train_data[[target_col]]
+  X_test = test_data[, -which(names(test_data) == target_col)]
+  y_test = test_data[[target_col]]
+  
+  show_elapsed_time(start_time, "Preparación de datos")
+  
+  # Función para realizar KNN con distancia de Gower
+  knn_gower = function(train, test, cl, k) {
+    gower_dist = daisy(rbind(train, test), metric = "gower")
+    gower_mat = as.matrix(gower_dist)
+    
+    n_train = nrow(train)
+    n_test = nrow(test)
+    
+    train_rows = 1:n_train
+    test_rows = (n_train + 1):(n_train + n_test)
+    
+    neighbors = t(apply(gower_mat[test_rows, train_rows, drop = FALSE], 1, order))
+    neighbors = neighbors[, 1:k, drop = FALSE]
+    
+    classes = matrix(cl[neighbors], nrow = nrow(neighbors))
+    predictions = apply(classes, 1, function(x) {
+      tab = table(x)
+      names(tab)[which.max(tab)]
+    })
+    
+    return(factor(predictions, levels = levels(cl)))
+  }
+  
+  # Función para calcular métricas
+  calculate_metrics = function(actual, predicted) {
+    cm = table(Predicted = predicted, Actual = actual)
+    
+    accuracy = sum(diag(cm)) / sum(cm)
+    error_rate = 1 - accuracy
+    
+    sensitivity = cm[2,2] / sum(cm[,2])
+    specificity = cm[1,1] / sum(cm[,1])
+    
+    false_positives = cm[2,1]
+    false_negatives = cm[1,2]
+    
+    kappa = (accuracy - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2) / 
+             (1 - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2)
+    
+    auc = auc(roc(actual, as.numeric(predicted)))
+    
+    return(list(
+      accuracy = accuracy,
+      error_rate = error_rate,
+      sensitivity = sensitivity,
+      specificity = specificity,
+      false_positives = false_positives,
+      false_negatives = false_negatives,
+      kappa = kappa,
+      auc = auc
+    ))
+  }
+  
+  # Función para realizar validación cruzada
+  cv_knn = function(X, y, k, folds = 5) {
+    set.seed(1234)
+    fold_indices = sample(rep(1:folds, length.out = nrow(X)))
+    cv_results = list()
+    
+    for (i in 1:folds) {
+      test_indices = which(fold_indices == i)
+      X_fold_train = X[-test_indices, ]
+      y_fold_train = y[-test_indices]
+      X_fold_test = X[test_indices, ]
+      y_fold_test = y[test_indices]
+      
+      pred = knn_gower(X_fold_train, X_fold_test, y_fold_train, k)
+      metrics = calculate_metrics(y_fold_test, pred)
+      
+      cv_results[[i]] = c(fold = i, k = k, metrics)
+    }
+    
+    return(cv_results)
+  }
+  
+  # Encontrar el mejor k
+  cat("Buscando el mejor k...\n")
+  cv_results = list()
+  for (k in k_range) {
+    fold_results = cv_knn(X_train, y_train, k)
+    cv_results = c(cv_results, fold_results)
+    mean_accuracy = mean(sapply(fold_results, function(x) x$accuracy))
+    cat(sprintf("k = %d, accuracy promedio = %.4f\n", k, mean_accuracy))
+  }
+  
+  # Convertir resultados a un data frame
+  cv_df = do.call(rbind, lapply(cv_results, as.data.frame))
+  
+  best_k = k_range[which.max(tapply(cv_df$accuracy, cv_df$k, mean))]
+  cat(sprintf("Mejor k encontrado: %d\n", best_k))
+  
+  show_elapsed_time(start_time, "Búsqueda del mejor k")
+  
+  # Entrenar el modelo final con el mejor k
+  cat("Entrenando el modelo final...\n")
+  final_model = knn_gower(X_train, X_test, y_train, best_k)
+  
+  show_elapsed_time(start_time, "Entrenamiento del modelo final")
+  
+  # Calcular métricas finales
+  final_metrics = calculate_metrics(y_test, final_model)
+  
+  show_elapsed_time(start_time, "Cálculo de métricas finales")
+  
+  end_time = Sys.time()
+  total_time = difftime(end_time, start_time, units = "secs")
+  
+  # Resultados
+  results = list(
+    cv_results = cv_df,
+    best_k = best_k,
+    final_metrics = final_metrics,
+    total_time = as.numeric(total_time)
+  )
+  
+  cat(sprintf("Tiempo total de ejecución: %.2f segundos\n", total_time))
+  
+  return(results)
+}
+
+results = knn_cancer_predictor(training, testing, "Breast")
+
+# Ver los resultados de la validación cruzada
+results$cv_results
+
+# Ver el mejor k
+results$best_k
+
+# Ver las métricas finales
+results$final_metrics
+
+# Ver el tiempo total de ejecución
+results$total_time
+```
+
+```{r}
+# Promediar todos los pliegues para cada k uasado:
+summary_df <- results$cv_results %>%
+  group_by(k) %>%
+  summarise(across(-fold, mean), .groups = 'drop') %>%
+  arrange(k) %>%
+  mutate(across(where(is.numeric), ~round(., 4)))
+
+# Resumen del cv:
+summary_df
+```
+
+------------------------------------------------------------------------
+
+# Gráficos de las métricas
+
+```{r}
+# KNN con el mejor k
+knn_final = results$cv_results %>% 
+  filter(k == 27) %>% 
+  select(-k) %>% 
+  mutate_at(.vars = vars(false_positives, false_negatives, auc), .funs = as.double)
+
+# Logistica:
+logistica_final = final %>% 
+  filter(Pliegue %in% 1:5) %>% 
+  rename(fold = Pliegue) %>% 
+  select(
+    fold, accuracy, error_rate, 
+    sensitivity, specificity, false_positives, 
+    false_negatives, kappa, auc
+    )
+
+# Unir ambos algoritmos: 
+metricas_finales = bind_rows(knn_final, logistica_final, .id = "algoritmo") %>% 
+  mutate(
+    algoritmo = case_when(
+      algoritmo == "1" ~ "KNN",
+      TRUE ~ "Logística"
+    )
+  ) %>% 
+  pivot_longer(cols = 3:10, names_to = "metrica", values_to = "resultado") %>% 
+  mutate(across(where(is.numeric), ~round(., 4)))
+```
+
+## Número de K necesarios en KNN
+
+```{r}
+results$cv_results %>% 
+  mutate_at(.vars = vars(false_positives, false_negatives, auc), .funs = as.double) %>%
+  select(-starts_with("false_")) %>% 
+  pivot_longer(cols = 3:8, names_to = "metrica", values_to = "resultado") %>% 
+  mutate(across(where(is.numeric), ~round(., 4))) %>% 
+  mutate(k_valor = as.factor(k)) %>% 
+  select(-k) %>% 
+  mutate(metrica = case_when(
+    metrica == "accuracy" ~ "Precisión",
+    metrica == "error_rate" ~ "Error",
+    metrica == "specificity" ~ "Tasa de verd. negativos", 
+    metrica == "sensitivity" ~ "Tasa de verd. positivos",
+    metrica == "kappa" ~ "Coeficiente Kappa",
+    TRUE ~ "AUC"
+  )) %>%
+  ggplot(aes(x = fold, y = resultado, 
+             color = k_valor, group = k_valor)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(facets = ~metrica, scales = "free") +
+  labs(
+    x = "Pliegue", y = "Resultado", 
+    color = "Núm. vecinos", group = "Núm. vecinos"
+  ) +
+  theme_bw() +
+  scale_color_tableau(palette = "Miller Stone")
+```
+
+## Métricas x pliegue
+
+La especificidad mide la proporción de verdaderos negativos (TN) correctamente identificados por el modelo en relación con el número total de verdaderos negativos y falsos positivos (FP).
+
+```{r}
+metricas_finales %>% 
+  filter(metrica %in% c("accuracy", "error_rate", "auc", 
+                        "specificity", "sensitivity", "kappa")) %>% 
+  mutate(metrica = case_when(
+    metrica == "accuracy" ~ "Precisión",
+    metrica == "error_rate" ~ "Error",
+    metrica == "specificity" ~ "Tasa de verd. negativos", 
+    metrica == "sensitivity" ~ "Tasa de verd. positivos",
+    metrica == "kappa" ~ "Coeficiente Kappa",
+    TRUE ~ "AUC"
+  )) %>% 
+  ggplot(aes(
+    x = fold, 
+    y = resultado, 
+    color = algoritmo, 
+    group = algoritmo,
+    shape = algoritmo,
+    linetype = algoritmo
+    )) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(facets = ~metrica, scales = "free_y") +
+  labs(
+    x = "Pliegue", y = "Resultado", 
+    color = "Algoritmo", shape = "Algoritmo", group = "Algoritmo", linetype = "Algoritmo"
+  ) +
+  theme_bw() +
+  scale_color_tableau(palette = "Miller Stone")
+```
+
