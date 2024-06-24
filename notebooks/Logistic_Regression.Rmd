@@ -1,0 +1,157 @@
+---
+title: "Logistic Regression Analysis"
+output: html_document
+date: "2024-06-23"
+---
+
+# Logistic Regression Analysis
+
+## Overview
+
+## Code Implementation
+
+### Load Libraries
+
+```{r}
+pacman::p_load(
+  # Data manipulation
+  tidyverse,
+  
+  #Logistic Regression:
+  magrittr, rio, here, caret, glmnet, performance, pROC,
+  
+  # Other:
+  ggthemes, scale
+)
+```
+
+### Import the Data
+
+```{r}
+df = read.csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed/data.csv")[,-c(1,2)]
+head(df)
+```
+
+#### Transform to the correct datatypes
+
+```{r}
+df = df %>% 
+  mutate_at(.vars = vars(Race, Education, 
+                         Coverage, GeneralHealth, 
+                         Children, Depression,
+                         Exercise, Smoker,
+                         Mammo, Breast), 
+            .funs = as.factor)
+
+df$Breast = relevel(x = df$Breast, ref = "No Breast Cancer")
+```
+
+#### Splitting the Dataset
+
+We'll be applying 10-fold for cross validation
+
+1.  Apply cross validation to see the optimal decision boundary
+    1.  We'll apply the following decision boundaries to compare [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]. Where if the y_predicted is bigger than the respective decision boundary will predict 1 \~ Breast Cancer
+
+```{r}
+folds = function(df, k, seed){
+  
+  set.seed(seed = seed)
+  
+  fold_group = sample(rep(1:k, length.out = nrow(df)))
+  
+  df$fold = fold_group
+  
+  return(df)
+  
+}
+```
+
+```{r}
+df_folds = folds(df, k = 10, seed = 8)
+```
+
+### Implementing Logistic Regression
+
+```{r}
+logistic_model = function(df_folds, n_test_fold, decision_boundary){
+  
+  logistic_model = glm(data = df_folds[df_folds$fold != n_test_fold,-ncol(df_folds)],
+             formula = Breast ~ ., family = binomial)
+  
+  y_pred_prob = predict(logistic_model, 
+                        type = 'response', 
+                        newdata = df_folds[df_folds$fold == n_test_fold,-ncol(df_folds)])
+  
+  y_pred = ifelse(y_pred_prob > decision_boundary, 1, 0)
+  
+  predictions = matrix(data = NA, nrow = length(y_pred), ncol = 2)
+  predictions = as.data.frame(predictions)
+  predictions[,1] = y_pred_prob
+  predictions[,2] = factor(y_pred, levels = c(0, 1), 
+                           labels = c("No Breast Cancer", "Breast Cancer"))
+  
+  return(predictions)
+  
+}
+```
+
+```{r}
+performance_logistic = function(y_pred, y_test, y_pred_prob){
+  
+  cm = confusionMatrix(y_test, y_pred ,positive = "Breast Cancer")
+  
+  results = c(
+    cm$overall['Accuracy'],
+    1 - cm$overall['Accuracy'], 
+    cm$byClass['Sensitivity'], 
+    cm$byClass['Specificity'],
+    fp = cm$table[1,2], 
+    fn = cm$table[2,1], 
+    cm$overall['Kappa'],
+    auc(roc(as.numeric(y_test), as.numeric(y_pred_prob)))
+  )
+  
+  return(results)
+  
+}
+```
+
+```{r}
+logistic_validation = function(df_folds, decision_boundary){
+  
+  final_df = matrix(data = NA,
+                    nrow = max(df_folds$fold), ncol = 10)
+  
+  for (fold in 1:max(df_folds$fold)){
+    
+    predictions = logistic_model(df_folds = df_folds, 
+                            n_test_fold = fold, 
+                            decision_boundary = decision_boundary)
+    
+    results = performance_logistic(y_pred = predictions[,2], 
+                                   y_test = df_folds$Breast[df_folds$fold == fold],
+                                   y_pred_prob = predictions[,1])
+    
+    results = c(fold, results, decision_boundary)
+    
+    final_df[fold,] = results
+  
+  }
+  
+  final_df = as.data.frame(final_df)
+  colnames(final_df) = c('Test Fold', "Accuracy", "Precision",
+                         "Sensitivity", "Specificity", "Fake_Positives",
+                         "Fake_Negatives", "Kappa", "auc", 'decision_boundary')
+  
+  
+  return(final_df)
+  
+}
+```
+
+```{r}
+for (i in c(0.2, 0.3, 0.4, 0.5, 0.6, 0.7)){
+ print(suppressMessages((logistic_validation(df_folds = df_folds, i)$Accuracy)))
+}
+```

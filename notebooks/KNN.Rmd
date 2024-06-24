@@ -1,0 +1,165 @@
+---
+title: "K-Nearest Neighbour Analysis"
+output: html_document
+date: "2024-06-24"
+---
+
+# K-Nearest Neighbour Analysis
+
+## Overview
+
+## Code Implementation
+
+### Load Libraries
+
+```{r}
+pacman::p_load(
+  # Data manipulation
+  tidyverse,
+  
+  #KNN:
+  magrittr, rio, here, caret, kknn, performance, pROC, class, cluster,
+  
+  # Other:
+  ggthemes, scale
+)
+```
+
+### Import the Data
+
+```{r}
+df = read.csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed/data.csv")[,-c(1,2)]
+head(df)
+```
+
+#### Transform to the correct datatypes
+
+```{r}
+df = df %>% 
+  mutate_at(.vars = vars(Race, Education, 
+                         Coverage, GeneralHealth, 
+                         Children, Depression,
+                         Exercise, Smoker,
+                         Mammo, Breast), 
+            .funs = as.factor)
+
+df$Breast = relevel(x = df$Breast, ref = "No Breast Cancer")
+```
+
+#### Splitting the Dataset
+
+We'll be applying 10-fold for cross validation
+
+1.  Apply cross validation to see the optimal decision boundary
+    1.  We'll apply the following decision boundaries to compare [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]. Where if the y_predicted is bigger than the respective decision boundary will predict 1 \~ Breast Cancer
+
+```{r}
+folds = function(df, k, seed){
+  
+  set.seed(seed = seed)
+  
+  fold_group = sample(rep(1:k, length.out = nrow(df)))
+  
+  df$fold = fold_group
+  
+  return(df)
+  
+}
+```
+
+```{r}
+df_folds = folds(df, k = 10, seed = 8)
+```
+
+
+### Implementing K Nearest Neighbour
+
+```{r}
+knn_model = function(df_folds, n_test_fold, k){
+  
+  predictions = c()
+  
+  train_len = nrow(df_folds[df_folds$fold != n_test_fold,-14])
+  train_rows = rownames(df_folds[df_folds$fold != n_test_fold,-14])
+  
+  test_len = nrow(df_folds[df_folds$fold == n_test_fold,-14])
+  
+  distances = as.matrix(daisy(rbind(df_folds[df_folds$fold != n_test_fold,-14],
+                                     df_folds[df_folds$fold == n_test_fold,-14])))
+  
+  distances = distances[1:train_len,-c(1:train_len)]
+  
+  distances_order = apply(distances, 2, order)
+  
+  distances_order = as.matrix(distances_order)
+  
+  rownames(distances_order) = train_rows
+  
+  for (test_value in 1:test_len){
+   
+    nearest_neighbours = df_folds[head(order(distances[,test_value]), k), 14]
+    
+    predictions[test_value] = names(which.max(table(nearest_neighbours)))
+    
+    predictions[test_value] = ifelse(predictions[test_value] == "Breast Cancer", 1, 0)
+    
+  }
+  
+  return(factor(predictions, levels = c(0, 1), labels = c("No Breast Cancer", "Breast Cancer")))
+}
+```
+
+```{r}
+performance_knn = function(predicted, y_test){
+  
+  
+    cm = table(predicted, y_test)
+    
+    results = c(sum(diag(cm)) / sum(cm), #Accuracy
+                1 - sum(diag(cm)) / sum(cm), #Precision
+                cm[2,2] / sum(cm[,2]), #Sensitivity
+                cm[1,1] / sum(cm[,1]), #Specificity
+                cm[2,1], #False Positives
+                cm[1,2], #False negatives
+                (sum(diag(cm)) / sum(cm) - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2) / (1 - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2), #Kappa
+                auc(roc(y_test, as.numeric(predicted))) #AUC
+    )
+    
+    return(results)
+  
+}
+```
+
+```{r}
+knn_validation = function(df_folds, k){
+  
+  final_df = matrix(data = NA,
+                  nrow = max(df_folds$fold), ncol = 10)
+  
+  for (fold in 1:max(df_folds$fold)){
+    
+    predictions = knn_model(df_folds = df_folds, n_test_fold = fold, k = k)
+    
+    results = performance_knn(predicted = predictions, y_test = df_folds[df_folds$fold == fold, 'Breast'])
+   
+    results = c(fold, results, k)
+    
+    final_df[fold,] = results  
+  }
+  
+  final_df = as.data.frame(final_df)
+  colnames(final_df) = c('Test Fold', "Accuracy", "Precision",
+                         "Sensitivity", "Specificity", "Fake_Positives",
+                         "Fake_Negatives", "Kappa", "auc", 'k')
+  
+  
+  return(final_df)
+}
+```
+
+```{r}
+knn_validation(df_folds = df_folds, k = 13)
+```
+
+
+

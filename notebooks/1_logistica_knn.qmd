@@ -36,21 +36,33 @@ pacman::p_load(
 
 ```{r}
 # Cargar la base de datos:
-base = read_csv("C:/Users/Ivan RC/Desktop/OneDrive - Universidad Latina/I-2024/2. Análisis Multivariado/Proyectos/Pred_Cancer/data/processed/data.csv")
+base = read_csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed/data.csv" )
 
 # Modificar algunas variables.
-base1 = base %>% 
+
+base = base %>% 
   mutate_at(.vars = vars(State, Race, Education, 
                          Coverage, GeneralHealth, 
                          Children, Depression,
                          Exercise, Smoker,
                          Mammo, Breast), 
-            .funs = as.factor) %>% 
-  select(-1)
+            .funs = as.factor)
+
+base = base[,-c(1,2)]
 
 # Poner la categoría que sí tiene cancer: 
-base1$Breast = relevel(x = base1$Breast, ref = "No Breast Cancer")
-contrasts(base1$Breast)
+base$Breast = relevel(x = base$Breast, ref = "No Breast Cancer")
+contrasts(base$Breast)
+```
+
+```{r}
+#Se observa la base de datos
+str(base)
+
+#Se decide estandarizar las variables continuas 
+base[,c(1,4,8,12)] = scale(base[,c(1,4,8,12)])
+
+base
 ```
 
 ## Partición de la muestra
@@ -61,7 +73,7 @@ Se trabaja con una muestra de 80% para entrenamiento y 20% para la prueba o test
 # Partición de los datos
 train = createDataPartition(
   # Variable respuesta:
-  y = base1$Breast,
+  y = base$Breast,
   # Proporción de los datos:
   p = 0.8,
   # No devolver la lista de los ID seleccionados:
@@ -69,10 +81,10 @@ train = createDataPartition(
 )
 
 # Base de entrenamiento: 
-training = base1[train,]
+training = base[train,]
 
 # Base de prueba (testeo):
-testing = base1[-train,] 
+testing = base[-train,] 
 ```
 
 ------------------------------------------------------------------------
@@ -85,7 +97,7 @@ Fuente: https://stats.oarc.ucla.edu/r/dae/logit-regression/
 
 ```{r}
 # Verificar si cada variable tiene algún NA:
-sapply(base1, function(x) sum(is.na(x)))
+sapply(base, function(x) sum(is.na(x)))
 ```
 
 ## Correlaciones
@@ -93,7 +105,20 @@ sapply(base1, function(x) sum(is.na(x)))
 Verificar la correrlación entre las variables numéricas.
 
 ```{r}
-training %>% select_if(is.numeric) %>% correlation::correlation()
+training %>% select_if(is.numeric) %>% cor()
+```
+
+```{r}
+training = training %>% 
+  mutate(breast_binario = case_when(
+    Breast == "Breast Cancer" ~ 1,
+    Breast == "No Breast Cancer" ~ 0
+  ))
+
+training %>% dplyr::select(breast_binario, Age, BMI, Sleep, AlcoholCons) %>% 
+  cor()
+
+training = training[,-15]
 ```
 
 ------------------------------------------------------------------------
@@ -128,14 +153,14 @@ for (i in 1:k) {
   
   # Entrenar el clasificador
   clasificador = glm(Breast ~ ., family = binomial, data = training_fold)
-  clasificador = step(clasificador, trace = FALSE)  # Aplicar stepwise
+  #clasificador = step(clasificador, trace = FALSE)  # Aplicar stepwise
   
   # Almacenar la fórmula del modelo ajustado
   model_formulas[[i]] = formula(clasificador)
   
   # Realizar predicciones en el conjunto de prueba (test_fold)
   y_pred_prob = predict(clasificador, type = 'response', newdata = test_fold)
-  y_pred = ifelse(y_pred_prob > 0.5, 1, 0)
+  y_pred = ifelse(y_pred_prob > 0.5, 1, 0) #El 0.5 es un hiperparametro
   y_pred = factor(y_pred, levels = c(0, 1), labels = c("No Breast Cancer", "Breast Cancer"))
   
   # Crear la matriz de confusión
@@ -161,46 +186,47 @@ for (i in 1:k) {
 # Mostrar los resultados de la validación cruzada
 final = as.data.frame(resultados) %>% mutate(Pliegue = 1:10)
 final
-
-# Mostrar las fórmulas de los modelos ajustados
-print(model_formulas)
-
-# --- Evaluación final con la base de prueba (testing) ---
-
-# Entrenar el modelo final con todo el conjunto de entrenamiento
-final_model = glm(Breast ~ ., family = binomial, data = training)
-final_model = step(final_model, trace = FALSE)  # Aplicar stepwise
-
-# Realizar predicciones en el conjunto de prueba (testing)
-final_pred_prob = predict(final_model, type = 'response', newdata = testing)
-final_pred = ifelse(final_pred_prob > 0.5, 1, 0)
-final_pred = factor(final_pred, levels = c(0, 1), labels = c("No Breast Cancer", "Breast Cancer"))
-
-# Crear la matriz de confusión
-final_cm = confusionMatrix(final_pred, testing$Breast, positive = "Breast Cancer")
-
-# Calcular métricas adicionales para la base de prueba
-final_fp = final_cm$table[2,1]  # Falsos positivos
-final_fn = final_cm$table[1,2]  # Falsos negativos
-
-# Obtener indicadores
-final_results = data.frame(
-  accuracy = final_cm$overall['Accuracy'],
-  error_rate = 1 - final_cm$overall['Accuracy'],  # Error rate
-  sensitivity = final_cm$byClass['Sensitivity'],
-  specificity = final_cm$byClass['Specificity'],
-  false_positives = final_fp,
-  false_negatives = final_fn,
-  kappa = final_cm$overall['Kappa'],
-  auc = auc(roc(as.numeric(testing$Breast), as.numeric(final_pred_prob)))
-)
-
-# Mostrar los resultados finales en el conjunto de prueba (testing)
-final ; final_results
 ```
 
-
 ------------------------------------------------------------------------
+
+```{r}
+# # Mostrar las fórmulas de los modelos ajustados
+# print(model_formulas)
+# 
+# # --- Evaluación final con la base de prueba (testing) ---
+# 
+# # Entrenar el modelo final con todo el conjunto de entrenamiento
+# final_model = glm(Breast ~ ., family = binomial, data = training)
+# final_model = step(final_model, trace = FALSE)  # Aplicar stepwise
+# 
+# # Realizar predicciones en el conjunto de prueba (testing)
+# final_pred_prob = predict(final_model, type = 'response', newdata = testing)
+# final_pred = ifelse(final_pred_prob > 0.5, 1, 0)
+# final_pred = factor(final_pred, levels = c(0, 1), labels = c("No Breast Cancer", "Breast Cancer"))
+# 
+# # Crear la matriz de confusión
+# final_cm = confusionMatrix(final_pred, testing$Breast, positive = "Breast Cancer")
+# 
+# # Calcular métricas adicionales para la base de prueba
+# final_fp = final_cm$table[2,1]  # Falsos positivos
+# final_fn = final_cm$table[1,2]  # Falsos negativos
+# 
+# # Obtener indicadores
+# final_results = data.frame(
+#   accuracy = final_cm$overall['Accuracy'],
+#   error_rate = 1 - final_cm$overall['Accuracy'],  # Error rate
+#   sensitivity = final_cm$byClass['Sensitivity'],
+#   specificity = final_cm$byClass['Specificity'],
+#   false_positives = final_fp,
+#   false_negatives = final_fn,
+#   kappa = final_cm$overall['Kappa'],
+#   auc = auc(roc(as.numeric(testing$Breast), as.numeric(final_pred_prob)))
+# )
+# 
+# # Mostrar los resultados finales en el conjunto de prueba (testing)
+# final ; final_results
+```
 
 ## KNN
 
@@ -472,4 +498,3 @@ metricas_finales %>%
   theme_bw() +
   scale_color_tableau(palette = "Miller Stone")
 ```
-
