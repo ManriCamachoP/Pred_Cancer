@@ -11,23 +11,21 @@ date: "2024-06-27"
 ## Code Implementation
 
 ```{r}
+#To download fastAdaboost
+##install.packages("BiocManager")
+##BiocManager::install("fastAdaboost")
+
 pacman::p_load(
   # Data manipulation
   tidyverse,
   
   #Tree:
-  magrittr, rio, here, caret, kknn, performance, pROC, class, randomForest,
+  magrittr, rio, here, caret, kknn, performance, pROC, class, adabag, fastAdaboost,
   
   # Other:
   ggthemes
 )
 ```
-
-
-```{r}
-
-```
-
 
 ### Import the Data
 
@@ -78,13 +76,13 @@ df_folds = folds(df, k = 10, seed = 8)
 ### Implementing Random Forest Method
 
 ```{r}
-boosting_model = function(df_folds, n_test_fold, m_final, coeflearn){
+boosting_model = function(df_folds, n_test_fold, nIter){
   
-  boosting_model = boosting(data = df_folds[df_folds$fold != n_test_fold,-15],
-                          Breast ~., m_final = m_final, boos = TRUE, coeflearn = coeflearn, 
+  boosting_model = adaboost(data = df_folds[df_folds$fold != n_test_fold,-15],
+                          Breast ~., nIter = nIter 
                           )
 
-  predictions = predict(rf_model, df_folds[df_folds$fold == n_test_fold,-c(14,15)])$class
+  predictions = predict(boosting_model, df_folds[df_folds$fold == n_test_fold,-c(14,15)])$class
   
   predictions = ifelse(predictions=="No Breast Cancer", yes = 0, no = 1)
   
@@ -104,7 +102,7 @@ performance_logistic = function(y_pred, y_test){
     cm$byClass['Sensitivity'], 
     cm$byClass['Specificity'],
     fp = cm$table[1,2]/(cm$table[1,2]+cm$table[1,1]), 
-    fn = cm$table[2,1]/(cm$table[2,1]+cm$table[2,2]), 
+    fn = cm$table[2,1]/(cm$table[2,1]+cm$table[2,2]),
     cm$overall['Kappa'],
     auc(roc(as.numeric(y_test), as.numeric(y_pred)))
   )
@@ -115,7 +113,7 @@ performance_logistic = function(y_pred, y_test){
 ```
 
 ```{r}
-boosting_validation = function(df_folds, m_final, coeflearn){
+boosting_validation = function(df_folds, nIter){
   
   final_df = matrix(data = NA,
                     nrow = max(df_folds$fold), ncol = 10)
@@ -124,13 +122,12 @@ boosting_validation = function(df_folds, m_final, coeflearn){
     
     predictions = boosting_model(df_folds = df_folds, 
                             n_test_fold = fold, 
-                            m_final = m_final, 
-                            coeflearn = coeflearn)
+                            nIter = nIter)
     
     results = performance_logistic(y_pred = predictions, 
                                    y_test = df_folds$Breast[df_folds$fold == fold])
     
-    results = c(fold, results, m_final, coeflearn)
+    results = c(fold, results, nIter)
     
     final_df[fold,] = results
   
@@ -139,7 +136,7 @@ boosting_validation = function(df_folds, m_final, coeflearn){
   final_df = as.data.frame(final_df)
   colnames(final_df) = c('Test Fold', "Accuracy", "Precision",
                          "Sensitivity", "Specificity", "Fake_Positives",
-                         "Fake_Negatives", "Kappa", "auc", 'm_final', 'coeflearn')
+                         "Fake_Negatives", "Kappa", "auc", 'nIter')
   
   
   return(final_df)
@@ -147,6 +144,50 @@ boosting_validation = function(df_folds, m_final, coeflearn){
 ```
 
 ```{r}
-boosting_validation(df_folds = df_folds, m_final = 50, coeflearn = 0.01)
+boosting_validation(df_folds = df_folds, nIter = 45)
 ```
+
+```{r}
+prueba = c(3,17,31,45,59)
+promedios = matrix(data = NA, ncol = 4, nrow = length(prueba))
+sd_matriz = matrix(data = NA, ncol = 4, nrow = length(prueba))
+
+for (i in 1:length(prueba)){
+  
+  boosting_base = suppressMessages(boosting_validation(df_folds = df_folds, nIter = prueba[i]))
+  
+  promedios[i,1] = suppressMessages(round(mean(boosting_base$Accuracy)*100,1))
+  promedios[i,2] = suppressMessages(round(mean(boosting_base$Precision)*100,1))
+  promedios[i,3] = suppressMessages(round(mean(boosting_base$Fake_Negatives)*100,1))
+  promedios[i,4] = suppressMessages(round(mean(boosting_base$auc)*100,1))
+  
+  sd_matriz[i,1] = suppressMessages(round(sd(boosting_base$Accuracy)*100,1))
+  sd_matriz[i,2] = suppressMessages(round(sd(boosting_base$Precision)*100,1))
+  sd_matriz[i,3] = suppressMessages(round(sd(boosting_base$Fake_Negatives)*100,1))
+  sd_matriz[i,4] = suppressMessages(round(sd(boosting_base$auc)*100,1))
+  
+}
+```
+
+
+```{r}
+df_promedios = as.data.frame(promedios)
+
+colnames(df_promedios) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_promedios) = prueba
+
+df_promedios
+```
+
+
+```{r}
+df_sd = as.data.frame(sd_matriz)
+
+colnames(df_sd) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_sd) = prueba
+
+df_sd
+```
+
+
 
