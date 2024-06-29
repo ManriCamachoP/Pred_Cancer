@@ -84,8 +84,8 @@ knn_model = function(df_folds, n_test_fold, k){
   
   test_len = nrow(df_folds[df_folds$fold == n_test_fold,-14])
   
-  distances = as.matrix(daisy(rbind(df_folds[df_folds$fold != n_test_fold,-14],
-                                     df_folds[df_folds$fold == n_test_fold,-14])))
+  distances = as.matrix(daisy(rbind(df_folds[df_folds$fold != n_test_fold,-c(14,ncol(df_folds))],
+                                     df_folds[df_folds$fold == n_test_fold,-c(14,ncol(df_folds))])))
   
   distances = distances[1:train_len,-c(1:train_len)]
   
@@ -119,8 +119,8 @@ performance_knn = function(predicted, y_test){
                 1 - sum(diag(cm)) / sum(cm), #Precision
                 cm[2,2] / sum(cm[,2]), #Sensitivity
                 cm[1,1] / sum(cm[,1]), #Specificity
-                cm[2,1], #False Positives
-                cm[1,2], #False negatives
+                cm[2,1] / (cm[2,1]+cm[1,1]) , #False Positives,
+                cm[1,2]/ (cm[1,2]+cm[2,2]) , #False Positives,
                 (sum(diag(cm)) / sum(cm) - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2) / (1 - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2), #Kappa
                 auc(roc(y_test, as.numeric(predicted))) #AUC
     )
@@ -157,9 +157,44 @@ knn_validation = function(df_folds, k){
 }
 ```
 
+
 ```{r}
-knn_validation(df_folds = df_folds, k = 13)
+prueba = c(3,7,13,21,29)
+promedios = matrix(data = NA, ncol = 4, nrow = length(prueba))
+sd_matriz = matrix(data = NA, ncol = 4, nrow = length(prueba))
+
+for (i in 1:length(prueba)){
+  
+  knn_base = knn_validation(df_folds = df_folds, k = prueba[i])
+  
+  promedios[i,1] = suppressMessages(round(mean(knn_base$Accuracy)*100,1))
+  promedios[i,2] = suppressMessages(round(mean(knn_base$Precision)*100,1))
+  promedios[i,3] = suppressMessages(round(mean(knn_base$Fake_Negatives)*100,1))
+  promedios[i,4] = suppressMessages(round(mean(knn_base$auc)*100,1))
+  
+  sd_matriz[i,1] = suppressMessages(round(sd(knn_base$Accuracy)*100,1))
+  sd_matriz[i,2] = suppressMessages(round(sd(knn_base$Precision)*100,1))
+  sd_matriz[i,3] = suppressMessages(round(sd(knn_base$Fake_Negatives)*100,1))
+  sd_matriz[i,4] = suppressMessages(round(sd(knn_base$auc)*100,1))
+  
+}
+```
+```{r}
+df_promedios = as.data.frame(promedios)
+
+colnames(df_promedios) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_promedios) = prueba
+
+df_promedios
 ```
 
+```{r}
+df_sd = as.data.frame(sd_matriz)
+
+colnames(df_sd) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_sd) = prueba
+
+df_sd
+```
 
 

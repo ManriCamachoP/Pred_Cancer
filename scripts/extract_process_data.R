@@ -100,15 +100,25 @@ df = df %>%
                          `_CHLDCNT` == 4 ~ 3,
                          `_CHLDCNT` == 5 ~ 3,
                          `_CHLDCNT` == 6 ~ 3,
-                         TRUE ~ NA)) %>%
+                         TRUE ~ NA),
+             Income = 
+               case_when(`_INCOMG1`== 1 ~ `_INCOMG1`,
+                         `_INCOMG1`== 2 ~ `_INCOMG1`,
+                         `_INCOMG1`== 3 ~ `_INCOMG1`,
+                         `_INCOMG1`== 4 ~ `_INCOMG1`,
+                         `_INCOMG1`== 5 ~ `_INCOMG1`,
+                         `_INCOMG1`== 6 ~ `_INCOMG1`,
+                         `_INCOMG1`== 7 ~ `_INCOMG1`,
+                         TRUE ~ NA),
+             UrbRur = `_METSTAT`) %>%
       select(`_STATE`, `_AGE80`, Race, Education, `_BMI5`,Coverage,
              GeneralHealth, Children, Sleep, Depression, Exercise, 
-             Smoker, AlcoholCons, Mammo, Breast) %>% 
+             Smoker, AlcoholCons, Mammo, Breast, Income, UrbRur) %>% 
       drop_na()
 
 
 colnames(df) = c("State", "Age", "Race", "Education", "BMI", "Coverage", "GeneralHealth", "Children","Sleep", "Depression",
-                 "Exercise","Smoker","AlcoholCons", "Mammo", "Breast")
+                 "Exercise","Smoker","AlcoholCons", "Mammo", "Breast", "Income", "UrbanRural")
 
 #View(df)
 

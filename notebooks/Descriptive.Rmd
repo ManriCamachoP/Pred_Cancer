@@ -34,8 +34,16 @@ execute:
 ```{r}
 #Data Manipulation and Visualization
 
-library(tidyverse) #Ecosystem which contains our main libraries as dplyr and ggplot2
-library(caret) #Data partitioning and model evaluation
+pacman::p_load(
+  # Data manipulation
+  tidyverse,
+  
+  #Logistic Regression:
+  magrittr, rio, here, caret, glmnet, performance, pROC, ROCR,
+  
+  # Other:
+  ggthemes, scale
+)
 ```
 
 ## Importing the dataset
@@ -48,64 +56,144 @@ data <- read.csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/
 
 ```{r}
 str(data)
+data$Breast = as.factor(data$Breast)
+data = data %>% 
+  mutate_at(.vars = vars(State, Race, Education, 
+                         Coverage, GeneralHealth, 
+                         Children, Depression,
+                         Exercise, Smoker,
+                         Mammo, Breast, Income, UrbanRural), 
+            .funs = as.factor)
 ```
 
 ```{r}
-na_data = matrix(rep(NA, length(colnames(data[,-1]))
-                     ), nrow = 1
-                 )
+factor_data = data[,sapply(data, is.factor)][,-1]
+
+for (i in 1:ncol(factor_data)){
+  if (i > 13){
+    
+    if ((i+1) > ncol(factor_data)){
+      
+      break
+      
+    }
+    
+    else{
+     
+      print(round(proportions(as.matrix(table(factor_data$Breast, factor_data[,i+1])),1)*100,1))
+      
+    }
+    
+    
+  }
+  else{
+    
+    print(round(proportions(as.matrix(table(factor_data$Breast, factor_data[,i])),1)*100,1))
+    
+  }
+}
+```
+```{r}
+ggdata = data.frame(matrix(data = c("Sí","Sí","No","No",
+                         "Realizado Mamografía", "No Realizado Mamografía","Realizado Mamografía", "No Realizado Mamografía",
+                         99.5, 0.5, 94.5, 5.5),nrow = 4, ncol = 3))
+colnames(ggdata) = c('Cancer', "Mamografia", "Valores")
+
+# Convertir la columna Valores a tipo numérico
+ggdata$Valores <- as.numeric(ggdata$Valores)
+
+ggdata$Mamografia <- factor(ggdata$Mamografia, levels = c("Realizado Mamografía", "No Realizado Mamografía"))
+
+# Calcular los porcentajes por grupo
+ggdata <- ggdata %>%
+  group_by(Cancer, Mamografia) %>%
+  summarise(Valores = sum(Valores)) %>%
+  mutate(Percent = Valores / sum(Valores) * 100)
+
+ggplot(data = ggdata, aes(x = Cancer, y = Percent, fill = Mamografia, label = paste0(round(Percent, 1), "%"))) +
+  geom_bar(stat = "identity", position = "dodge", color = "black", size = 0.3) +
+  labs(x = "Cáncer de Mama", y = "Porcentaje (%)", fill = "Mamografia",
+       title = "Comparación de Distribución Porcentual de Realización de Mamografia",
+       subtitle = "Fijando Cáncer de Mama y No Cáncer de Mama") +
+  geom_text(position = position_dodge(width = 0.9), vjust = -0.5) +
+  scale_fill_manual(values = c("#377eb8","#aec7e8")) + 
+  theme_minimal() +
+  theme(
+    legend.position = "right",   # Colocar la leyenda arriba del gráfico
+    legend.box.spacing = unit(0.1, "cm"),  # Ajustar el espacio alrededor de la caja de la leyenda
+    plot.title = element_text(size = 15, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5)
+    )
+```
+                      1    2    3    4    5    7    8
+  Breast Cancer    82.0  6.2  1.5  2.7  0.5  2.2  5.0
+  No Breast Cancer 91.2  2.3  0.9  1.0  0.3  1.9  2.5
+
+```{r}
+ggdata = data.frame(matrix(data = c("Sí","Sí","Sí","Sí","Sí","Sí","Sí","No","No","No","No","No","No","No",
+                         "Blanco", "Negro","Indio-Americano", "Asiatico", "Hawaiano", "Multiracial","Hispano",
+                         "Blanco", "Negro","Indio-Americano", "Asiatico", "Hawaiano", "Multiracial","Hispano",
+                         82.0, 6.2, 1.5, 2.7, 0.5, 2.2, 5.0,
+                         91.2, 2.3, 0.9, 1.0, 0.3, 1.9, 2.5), ncol = 3))
+colnames(ggdata) = c('Cancer', "Etnia", "Valores")
+
+# Convertir la columna Valores a tipo numérico
+ggdata$Valores <- as.numeric(ggdata$Valores)
+
+ggdata$Etnia <- factor(ggdata$Etnia, levels = c("Blanco", "Negro", "Hispano", "Multiracial","Asiatico",'Indio-Americano','Hawaiano'))
+
+# Calcular los porcentajes por grupo
+ggdata <- ggdata %>%
+  group_by(Cancer, Etnia) %>%
+  summarise(Valores = sum(Valores)) %>%
+  mutate(Percent = Valores / sum(Valores) * 100)
+
+ggplot(data = ggdata, aes(x = Cancer, y = Percent, fill = Etnia, label = paste0(round(Percent, 1), "%"))) +
+  geom_bar(stat = "identity", position = "dodge", color = "black", size = 0.3) +
+  labs(x = "Cáncer de Mama", y = "Porcentaje (%)", fill = "Etnia",
+       title = "Comparación de Distribución Porcentual de Etnias",
+       subtitle = "Fijando Cáncer de Mama y No Cáncer de Mama") +
+  geom_text(position = position_dodge(width = 0.9), vjust = -0.5) +
+  scale_fill_manual(values = c("#4575b4","#d73027", "#74c476", "#fdae61", "#abd9e9", "#fee08b", "#9e9ac8")) + 
+  theme_minimal() +
+  theme(
+    legend.position = "right",   # Colocar la leyenda arriba del gráfico
+    legend.box.spacing = unit(0.2, "cm"),  # Ajustar el espacio alrededor de la caja de la leyenda
+    plot.title = element_text(size = 15, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5)
+    )
+```
 
 
-for (i in 2:ncol(data)){
- 
-  na_data[1,i-1] = sum(is.na(data[,i]))
-   
+
+```{r}
+num_data = data[,sapply(data, is.numeric)]
+
+mah_dist <- mahalanobis(num_data, colMeans(num_data), cov(num_data))
+outlier_threshold <- quantile(mah_dist, 0.95)
+outliers <- which(mah_dist > outlier_threshold)
+```
+
+```{r}
+#setwd("/Users/manriquecamacho/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed")
+
+#data = data[-outliers,]
+
+#write.csv(data, "data.csv")
+```
+
+```{r}
+# Set up multi-panel plotting
+par(mfrow = c(1, ncol(num_data)))
+
+colnames(num_data) = c("Edad", "BMI", "Horas de Sueño", "Consumo de Alcohol")
+
+# Loop through each numeric column and plot histogram
+for (i in seq_along(num_data)) {
+  hist(num_data[, i], main = colnames(num_data)[i], xlab = "Values", col = "#1f77b4", border = "white")
 }
 
-na_data = as.data.frame(x = na_data)
-colnames(na_data) = colnames(data[,-1])
-row.names(na_data) = "Cantidad NA"
-as.data.frame(t(na_data))$`Cantidad NA` - nrow(data)
-
-
-na_data[2,] = abs(as.data.frame(t(na_data))$`Cantidad NA` - nrow(data))
-
-row.names(na_data) = c("Cantidad NA", "Cantidad de Valores Completos")
-na_data = as.data.frame(t(na_data)); na_data
-
-na_data$Variable <- rownames(na_data)
-na_data_long <- pivot_longer(na_data, cols = c("Cantidad NA", "Cantidad de Valores Completos"), names_to = "Status", values_to = "Count")
-
-na_data_long <- na_data_long %>%
-  group_by(Variable) %>%
-  mutate(Total_NA = sum(Count[Status == "Cantidad NA"])) %>%
-  ungroup() %>%
-  arrange(Total_NA) %>%
-  mutate(Variable = factor(Variable, levels = unique(Variable)))
-
-
-na_data_long <- na_data_long %>%
-  group_by(Variable) %>%
-  mutate(Percentage = ifelse(Status == "Cantidad NA" & Count > 0.9, paste0(round((Count / sum(Count)) * 100, 1), "%"), ""))
-
-
-# Crear el gráfico de barras apiladas con códigos de color HTML
-ggplot(na_data_long, aes(x = Variable, y = Count, fill = Status)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = Percentage), position = position_stack(vjust = 0.5), color = "white", size = 3) +
-  labs(title = "Conteo de Valores NA y No-NA por Variable",
-       x = "Variable",
-       y = "Conteo") +
-  scale_fill_manual(values = c("Cantidad NA" = "#FF6347", "Cantidad de Valores Completos" = "#1E90FF"))+
-  coord_flip()+
-  theme_minimal()+ 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1.2),
-        legend.position = "top",
-      legend.title = element_blank(),
-      legend.key.size = unit(0.5, "cm"))
-
-
-data2 = drop_na(data)
-
-sum(data2$BreastCancer=="Breast Cancer")/nrow(data2)
+# Reset plotting parameters after plotting
+par(mfrow = c(1, 1))
 ```
+

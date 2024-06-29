@@ -1,0 +1,246 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-06-26"
+---
+
+# Methods of Tree
+
+## Overview
+
+## Code Implementation
+
+```{r}
+pacman::p_load(
+  # Data manipulation
+  tidyverse,
+  
+  #Tree:
+  magrittr, rio, here, caret, kknn, performance, pROC, class, rpart, rattle, DT,
+  
+  # Other:
+  ggthemes, scale
+)
+```
+
+### Import the Data
+
+```{r}
+df = read.csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed/data.csv")[,-c(1,2)]
+head(df)
+```
+
+#### Transform to the correct datatypes
+
+```{r}
+df = df %>% 
+  mutate_at(.vars = vars(Race, Education, 
+                         Coverage, GeneralHealth, 
+                         Children, Depression,
+                         Exercise, Smoker,
+                         Mammo, Breast), 
+            .funs = as.factor)
+
+df$Breast = relevel(x = df$Breast, ref = "No Breast Cancer")
+```
+
+#### Splitting the Dataset
+
+We'll be applying 10-fold for cross validation
+
+1.  Apply cross validation to see the optimal decision boundary
+    1.  We'll apply the following hyperparameters to compare . Where if the y_predicted is bigger than the respective decision boundary will predict 1 \~ Breast Cancer
+
+```{r}
+folds = function(df, k, seed){
+  
+  set.seed(seed = seed)
+  
+  fold_group = sample(rep(1:k, length.out = nrow(df)))
+  
+  df$fold = fold_group
+  
+  return(df)
+  
+}
+```
+
+```{r}
+df_folds = folds(df, k = 10, seed = 8)
+```
+
+### Implementing Tree Method
+
+```{r}
+tree_model = function(df_folds, n_test_fold, cp, maxdepth = 10){
+  
+  if (maxdepth == 10){
+    
+    tree = rpart(data = df_folds[df_folds$fold != n_test_fold,-ncol(df_folds)],
+             formula = Breast ~., method = "class", 
+             control=rpart.control(minsplit= 0.01 * nrow(df_folds[df_folds$fold !=n_test_fold,-ncol(df_folds)]),
+                                   minbucket=0.005 * nrow(df_folds[df_folds$fold !=n_test_fold,-ncol(df_folds)]), 
+                                   cp=cp, maxdepth = 10))
+    
+  }
+  else{
+    
+    tree = rpart(data = df_folds[df_folds$fold != n_test_fold,-ncol(df_folds)],
+             formula = Breast ~., method = "class", 
+             control=rpart.control(minsplit= 0.01 * nrow(df_folds[df_folds$fold !=n_test_fold,-ncol(df_folds)]),
+                                   minbucket=0.005 * nrow(df_folds[df_folds$fold !=n_test_fold,-ncol(df_folds)]), 
+                                   cp=cp,
+                                   maxdepth = maxdepth))
+    
+  }
+
+
+  
+  predictions = predict(tree, newdata =  df_folds[df_folds$fold == n_test_fold,],
+                        type = "class")
+  
+  predictions = ifelse(predictions=="No Breast Cancer", yes = 0, no = 1)
+  
+  return(factor(predictions, levels = c(0, 1), labels = c("No Breast Cancer", "Breast Cancer")))
+
+  
+}
+```
+
+```{r}
+performance_logistic = function(y_pred, y_test){
+  
+  cm = confusionMatrix(y_test, y_pred ,positive = "Breast Cancer")
+  
+  results = c(
+    cm$overall['Accuracy'],
+    1 - cm$overall['Accuracy'], 
+    cm$byClass['Sensitivity'], 
+    cm$byClass['Specificity'],
+    fp = cm$table[1,2]/(cm$table[1,2]+cm$table[1,1]), 
+    fn = cm$table[2,1]/(cm$table[2,1]+cm$table[2,2]), 
+    cm$overall['Kappa'],
+    auc(roc(as.numeric(y_test), as.numeric(y_pred)))
+  )
+  
+  return(results)
+  
+}
+```
+
+```{r}
+tree_validation = function(df_folds, cp, maxdepth = 10){
+  
+  final_df = matrix(data = NA,
+                    nrow = max(df_folds$fold), ncol = 11)
+  
+  for (fold in 1:max(df_folds$fold)){
+    
+    predictions = tree_model(df_folds = df_folds, 
+                            n_test_fold = fold, 
+                            cp=cp,
+                            maxdepth = maxdepth)
+    
+    results = performance_logistic(y_pred = predictions, 
+                                   y_test = df_folds$Breast[df_folds$fold == fold])
+    
+    results = c(fold, results, cp, maxdepth)
+    
+    final_df[fold,] = results
+  
+  }
+  
+  final_df = as.data.frame(final_df)
+  colnames(final_df) = c('Test Fold', "Accuracy", "Precision",
+                         "Sensitivity", "Specificity", "Fake_Positives",
+                         "Fake_Negatives", "Kappa", "auc", 'cp', 'maxdepth')
+  
+  
+  return(final_df)
+  
+}
+```
+
+Calibrating cp
+
+```{r}
+prueba = c(0.01,0.075,0.005,0.0025,0.001)
+promedios = matrix(data = NA, ncol = 4, nrow = length(prueba))
+sd_matriz = matrix(data = NA, ncol = 4, nrow = length(prueba))
+
+for (i in 1:length(prueba)){
+  
+  tree_base = suppressMessages(tree_validation(df_folds = df_folds, cp = prueba[i]))
+  
+  promedios[i,1] = suppressMessages(round(mean(tree_base$Accuracy)*100,1))
+  promedios[i,2] = suppressMessages(round(mean(tree_base$Precision)*100,1))
+  promedios[i,3] = suppressMessages(round(mean(tree_base$Fake_Negatives)*100,1))
+  promedios[i,4] = suppressMessages(round(mean(tree_base$auc)*100,1))
+  
+  sd_matriz[i,1] = suppressMessages(round(sd(tree_base$Accuracy)*100,1))
+  sd_matriz[i,2] = suppressMessages(round(sd(tree_base$Precision)*100,1))
+  sd_matriz[i,3] = suppressMessages(round(sd(tree_base$Fake_Negatives)*100,1))
+  sd_matriz[i,4] = suppressMessages(round(sd(tree_base$auc)*100,1))
+  
+}
+```
+```{r}
+df_promedios = as.data.frame(promedios)
+
+colnames(df_promedios) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_promedios) = prueba
+
+df_promedios
+```
+
+```{r}
+df_sd = as.data.frame(sd_matriz)
+
+colnames(df_sd) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_sd) = prueba
+
+df_sd
+```
+
+Calibrating maxdepth
+
+```{r}
+prueba = c(24,17,10,7,4)
+promedios = matrix(data = NA, ncol = 4, nrow = length(prueba))
+sd_matriz = matrix(data = NA, ncol = 4, nrow = length(prueba))
+
+for (i in 1:length(prueba)){
+  
+  tree_base = suppressMessages(tree_validation(df_folds = df_folds, cp = 0.001, maxdepth = prueba[i]))
+  
+  promedios[i,1] = suppressMessages(round(mean(tree_base$Accuracy)*100,1))
+  promedios[i,2] = suppressMessages(round(mean(tree_base$Precision)*100,1))
+  promedios[i,3] = suppressMessages(round(mean(tree_base$Fake_Negatives)*100,1))
+  promedios[i,4] = suppressMessages(round(mean(tree_base$auc)*100,1))
+  
+  sd_matriz[i,1] = suppressMessages(round(sd(tree_base$Accuracy)*100,1))
+  sd_matriz[i,2] = suppressMessages(round(sd(tree_base$Precision)*100,1))
+  sd_matriz[i,3] = suppressMessages(round(sd(tree_base$Fake_Negatives)*100,1))
+  sd_matriz[i,4] = suppressMessages(round(sd(tree_base$auc)*100,1))
+  
+}
+```
+
+```{r}
+df_promedios = as.data.frame(promedios)
+
+colnames(df_promedios) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_promedios) = prueba
+
+df_promedios
+```
+
+```{r}
+df_sd = as.data.frame(sd_matriz)
+
+colnames(df_sd) = c("Precision", "Error", "FalsosNegativos", "AUC")
+rownames(df_sd) = prueba
+
+df_sd
+```
+
