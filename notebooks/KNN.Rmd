@@ -122,7 +122,7 @@ performance_knn = function(predicted, y_test){
                 cm[2,1] / (cm[2,1]+cm[1,1]) , #False Positives,
                 cm[1,2]/ (cm[1,2]+cm[2,2]) , #False Positives,
                 (sum(diag(cm)) / sum(cm) - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2) / (1 - sum(rowSums(cm) * colSums(cm)) / sum(cm)^2), #Kappa
-                auc(roc(y_test, as.numeric(predicted))) #AUC
+                auc(roc(as.numeric(y_test), as.numeric(predicted))) #AUC
     )
     
     return(results)

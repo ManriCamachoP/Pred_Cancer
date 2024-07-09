@@ -110,7 +110,7 @@ performance_logistic = function(y_pred, y_test, y_pred_prob){
     fp = cm$table[1,2]/(cm$table[1,2] + cm$table[1,1]), 
     fn = cm$table[2,1]/(cm$table[2,2] + cm$table[2,1]), 
     cm$overall['Kappa'],
-    auc(roc(as.numeric(y_test), as.numeric(y_pred)))
+    auc(roc(as.numeric(y_test), as.numeric(y_pred_prob)))
   )
   
   return(results)

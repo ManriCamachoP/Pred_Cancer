@@ -62,7 +62,7 @@ data = data %>%
                          Coverage, GeneralHealth, 
                          Children, Depression,
                          Exercise, Smoker,
-                         Mammo, Breast, Income, UrbanRural), 
+                         Mammo, Breast), 
             .funs = as.factor)
 ```
 

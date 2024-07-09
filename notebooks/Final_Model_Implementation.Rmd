@@ -1,0 +1,56 @@
+---
+title: "Final Model"
+output: html_document
+date: "2024-07-01"
+---
+
+# Overview
+
+# Code Implementation
+
+### Load Libraries
+
+```{r}
+pacman::p_load(
+  # Data manipulation
+  tidyverse,
+  
+  #Logistic Regression:
+  magrittr, rio, here, caret, glmnet, performance, pROC, ROCR,
+  
+  # Other:
+  ggthemes, scale
+)
+```
+
+### Import the Data
+
+```{r}
+df = read.csv("~/Library/CloudStorage/OneDrive-UniversidaddeCostaRica/GitHub/Predicción_Cancer/data/processed/data.csv")[,-c(1,2)]
+head(df)
+```
+
+#### Transform to the correct datatypes
+
+```{r}
+df = df %>% 
+  mutate_at(.vars = vars(Race, Education, 
+                         Coverage, GeneralHealth, 
+                         Children, Depression,
+                         Exercise, Smoker,
+                         Mammo, Breast), 
+            .funs = as.factor)
+
+df$Breast = relevel(x = df$Breast, ref = "No Breast Cancer")
+```
+
+#### Adjusting the Logistic Model
+
+```{r}
+logistic_model = glm(data = df,
+             formula = Breast ~ ., family = binomial)
+```
+
+
+
+
